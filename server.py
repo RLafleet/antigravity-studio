@@ -19,7 +19,7 @@ from config import (
 from gemini_client import GeminiClient
 from spec_architect import (
     scan_workspace, architect_task,
-    auto_determine_model_and_thinking, PLAYBOOKS
+    auto_determine_model_and_thinking, get_playbooks, PLAYBOOKS_FILE
 )
 from worker_engine import WorkerEngine
 from test_engine import (
@@ -116,8 +116,18 @@ async def test_key():
 
 
 @app.get("/api/playbooks")
-async def get_playbooks():
-    return {"ok": True, "playbooks": PLAYBOOKS}
+async def get_playbooks_endpoint():
+    return {"ok": True, "playbooks": get_playbooks()}
+
+
+@app.post("/api/playbooks")
+async def save_playbooks_endpoint(req: List[Dict[str, Any]]):
+    try:
+        with open(PLAYBOOKS_FILE, "w", encoding="utf-8") as f:
+            json.dump(req, f, indent=2, ensure_ascii=False)
+        return {"ok": True, "playbooks": req}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 @app.post("/api/scan")
