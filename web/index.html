@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Antigravity Orchestrator</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            darkBg: '#0b0f19',
+            cardBg: '#111827',
+            cardBorder: '#1f2937'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b0f19; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  </style>
+</head>
+<body class="bg-[#0b0f19] text-gray-100 min-h-screen flex flex-col font-sans select-none">
+
+  <!-- Top Navigation Header -->
+  <header class="h-14 border-b border-gray-800 bg-[#0f172a]/80 backdrop-blur px-5 flex items-center justify-between shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
+        AG
+      </div>
+      <div>
+        <h1 class="text-sm font-semibold tracking-wide flex items-center gap-2">
+          Antigravity Orchestrator
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">v1.1</span>
+        </h1>
+        <p class="text-[11px] text-gray-400">Gemini Tech Lead &middot; Model Thinking Control</p>
+      </div>
+    </div>
+
+    <!-- Active Workspace Quick Bar -->
+    <div class="flex items-center gap-2 bg-gray-900/90 border border-gray-800 rounded-lg px-3 py-1 text-xs max-w-lg truncate">
+      <span class="text-gray-400">📁 Папка:</span>
+      <span id="current-workspace-label" class="text-gray-200 mono truncate font-medium max-w-[200px]">Не выбрана</span>
+      <button onclick="selectFolderDialog()" class="px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-indigo-300 hover:text-white transition text-[11px]">
+        Выбрать
+      </button>
+      <button onclick="openFolderInExplorer()" title="Открыть папку проекта в Проводнике Windows" class="px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-emerald-400 hover:text-white transition text-[11px] flex items-center gap-1 font-medium">
+        📂 Проводник
+      </button>
+    </div>
+
+    <!-- Status & Settings -->
+    <div class="flex items-center gap-3">
+      <div id="api-status-badge" class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-gray-800 text-gray-400 border border-gray-700">
+        <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+        <span>Загрузка моделей...</span>
+      </div>
+      <button onclick="switchTab('settings')" class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition">
+        ⚙️
+      </button>
+    </div>
+  </header>
+
+  <!-- App Layout -->
+  <div class="flex flex-1 overflow-hidden">
+    
+    <!-- Left Navigation Rail -->
+    <nav class="w-56 border-r border-gray-800 bg-[#0f172a]/40 p-3 flex flex-col gap-1.5 shrink-0">
+      <button onclick="switchTab('new-task')" id="tab-btn-new-task" class="nav-btn active flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-white bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 transition">
+        <span class="text-base">🚀</span> Новая задача
+      </button>
+      <button onclick="switchTab('monitor')" id="tab-btn-monitor" class="nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800/60 transition">
+        <span class="text-base">⚡</span> Мониторинг
+        <span id="monitor-badge" class="hidden ml-auto w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+      </button>
+      <button onclick="switchTab('playbooks')" id="tab-btn-playbooks" class="nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800/60 transition">
+        <span class="text-base">📋</span> Шаблоны / Playbooks
+      </button>
+      <button onclick="switchTab('sandbox')" id="tab-btn-sandbox" class="nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800/60 transition">
+        <span class="text-base">🧪</span> Песочница & Тесты
+      </button>
+      <button onclick="switchTab('git')" id="tab-btn-git" class="nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800/60 transition">
+        <span class="text-base">🐙</span> Git & Репозиторий
+      </button>
+      <button onclick="switchTab('history')" id="tab-btn-history" class="nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800/60 transition">
+        <span class="text-base">📜</span> История заданий
+      </button>
+      <button onclick="switchTab('settings')" id="tab-btn-settings" class="nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800/60 transition">
+        <span class="text-base">⚙️</span> Настройки
+      </button>
+
+      <!-- Token savings highlight box -->
+      <div class="mt-auto p-3 rounded-xl bg-gradient-to-b from-indigo-950/40 to-cyan-950/20 border border-indigo-500/20 text-[11px] text-gray-300">
+        <div class="flex items-center gap-1.5 text-indigo-400 font-semibold mb-1">
+          <span>🔥</span> Экономия токенов
+        </div>
+        <p class="text-gray-400 leading-tight">
+          Формулирование спеки на английском + точные пути к файлам экономят до <b class="text-emerald-400">70% контекста</b> в каждом диалоге.
+        </p>
+      </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col overflow-y-auto bg-[#0b0f19] p-6">
+
+      <!-- ================= TAB: NEW TASK ================= -->
+      <section id="tab-new-task" class="tab-pane flex flex-col gap-5 max-w-4xl mx-auto w-full">
+        <div class="flex flex-col gap-1">
+          <h2 class="text-xl font-bold text-white tracking-tight">Поставить задачу оркестратору</h2>
+          <p class="text-xs text-gray-400">
+            Опиши задачу своими словами на русском. Gemini Tech Lead изучит структуру проекта, создаст строгую техническую спецификацию на английском и передаст исполнителю.
+          </p>
+        </div>
+
+        <!-- Prompt Card -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl flex flex-col gap-4">
+          
+          <!-- Model & Thinking Level Selector Bar -->
+          <div class="flex flex-wrap items-center justify-between gap-3 p-2.5 rounded-lg bg-gray-950/70 border border-gray-800">
+            <div class="flex items-center gap-2 flex-1 min-w-[280px]">
+              <span class="text-xs text-gray-400 font-medium">🤖 Модель:</span>
+              <select
+                id="task-model-select"
+                onchange="handleTaskModelChange()"
+                class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-100 outline-none focus:border-indigo-500"
+              >
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+
+            <!-- Thinking Level Selector -->
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-400 font-medium">🧠 Рассуждения (Thinking):</span>
+              <div class="flex items-center bg-gray-900 border border-gray-700 rounded-lg p-0.5">
+                <button
+                  type="button"
+                  onclick="setThinkingLevel('high')"
+                  id="think-btn-high"
+                  class="think-pill px-2.5 py-1 rounded text-[11px] font-medium transition bg-indigo-600 text-white shadow"
+                >
+                  High
+                </button>
+                <button
+                  type="button"
+                  onclick="setThinkingLevel('medium')"
+                  id="think-btn-medium"
+                  class="think-pill px-2.5 py-1 rounded text-[11px] font-medium text-gray-400 hover:text-white transition"
+                >
+                  Medium
+                </button>
+                <button
+                  type="button"
+                  onclick="setThinkingLevel('low')"
+                  id="think-btn-low"
+                  class="think-pill px-2.5 py-1 rounded text-[11px] font-medium text-gray-400 hover:text-white transition"
+                >
+                  Low
+                </button>
+                <button
+                  type="button"
+                  onclick="setThinkingLevel('off')"
+                  id="think-btn-off"
+                  class="think-pill px-2 py-1 rounded text-[11px] font-medium text-gray-400 hover:text-white transition"
+                >
+                  Off
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chips / Presets -->
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs text-gray-400">Быстрый шаблон:</span>
+            <button onclick="applyPreset('bug')" class="px-2.5 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-xs text-red-300 transition">
+              🐛 Исправить баг
+            </button>
+            <button onclick="applyPreset('feature')" class="px-2.5 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-xs text-emerald-300 transition">
+              ✨ Новая фича
+            </button>
+            <button onclick="applyPreset('test')" class="px-2.5 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-xs text-cyan-300 transition">
+              🧪 Написать тесты
+            </button>
+            <button onclick="applyPreset('refactor')" class="px-2.5 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-xs text-purple-300 transition">
+              🧹 Рефакторинг
+            </button>
+          </div>
+
+          <!-- Textarea -->
+          <div class="relative">
+            <textarea
+              id="user-prompt-input"
+              rows="4"
+              placeholder="Пример: В роутере заказов добавь отправку уведомления в Telegram при смене статуса на 'оплачен'. Напиши тесты."
+              class="w-full bg-gray-950/80 border border-gray-800 focus:border-indigo-500 rounded-lg p-3.5 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:ring-1 focus:ring-indigo-500 resize-none"
+            ></textarea>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex items-center justify-between pt-2">
+            <div class="flex items-center gap-3 text-xs text-gray-400">
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" id="auto-run-checkbox" checked class="rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-0" />
+                <span>Автоматический запуск после архитектуры</span>
+              </label>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <button
+                onclick="handleArchitectAndRun(false)"
+                id="btn-review-spec"
+                class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 text-xs font-medium text-gray-200 transition"
+              >
+                👀 Сначала проверить спеку
+              </button>
+              <button
+                onclick="handleArchitectAndRun(true)"
+                id="btn-auto-run"
+                class="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-lg shadow-indigo-600/30 transition flex items-center gap-2"
+              >
+                <span>⚡ Запустить задачу</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Spec Review Card (Dynamically displayed when generated) -->
+        <div id="spec-result-card" class="hidden bg-gray-900 border border-indigo-500/30 rounded-xl p-5 shadow-2xl flex flex-col gap-4">
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Спецификация готова</span>
+                <h3 id="spec-title" class="text-sm font-bold text-white">Title</h3>
+              </div>
+              <p id="spec-title-ru" class="text-xs text-gray-400 mt-0.5">Краткое описание на русском</p>
+            </div>
+            <button onclick="executeCurrentSpec()" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20">
+              <span>▶ Запустить в Antigravity</span>
+            </button>
+          </div>
+
+          <!-- Token Savings Summary Banner -->
+          <div id="token-savings-banner" class="bg-indigo-950/30 border border-indigo-500/20 rounded-lg p-3 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2 text-indigo-300">
+              <span>💡</span>
+              <span id="token-savings-text">Сэкономлено ~55,000 токенов контекста</span>
+            </div>
+            <span class="text-[11px] text-gray-400 font-mono" id="token-pct-saved">~58% экономии</span>
+          </div>
+
+          <!-- Target Files & Objective -->
+          <div class="grid grid-cols-2 gap-4 text-xs">
+            <div class="bg-gray-950/60 p-3 rounded-lg border border-gray-800">
+              <span class="text-gray-400 font-semibold block mb-1">🎯 Главная цель (Objective):</span>
+              <p id="spec-objective" class="text-gray-200 mono text-[11px]"></p>
+            </div>
+            <div class="bg-gray-950/60 p-3 rounded-lg border border-gray-800">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-gray-400 font-semibold block">📁 Целевые файлы:</span>
+                <button onclick="openFolderInExplorer()" class="text-[11px] text-emerald-400 hover:text-white transition flex items-center gap-1 font-medium hover:underline">
+                  📂 Открыть папку
+                </button>
+              </div>
+              <div id="spec-files" class="flex flex-wrap gap-1 text-[11px]"></div>
+            </div>
+          </div>
+
+          <!-- Prompt Preview Accordion -->
+          <details class="bg-gray-950/60 rounded-lg border border-gray-800 text-xs group">
+            <summary class="px-3 py-2 cursor-pointer text-gray-400 hover:text-white font-medium flex items-center justify-between">
+              <span>Посмотреть полный промпт для Antigravity (English)</span>
+              <span class="text-[10px] text-gray-500">Развернуть ▼</span>
+            </summary>
+            <div class="p-3 border-t border-gray-800">
+              <pre id="spec-antigravity-prompt" class="mono text-[11px] text-gray-300 whitespace-pre-wrap max-h-60 overflow-y-auto"></pre>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- ================= TAB: LIVE MONITOR ================= -->
+      <section id="tab-monitor" class="tab-pane hidden flex flex-col gap-5 max-w-5xl mx-auto w-full h-full">
+        <!-- Status Header Bar -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center justify-between shadow-lg">
+          <div class="flex items-center gap-3">
+            <div id="worker-status-spinner" class="w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span id="worker-status-title" class="text-sm font-bold text-white">Выполнение задания</span>
+                <span id="worker-model-badge" class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 mono font-semibold">Gemini 3.8 Flash</span>
+                <span id="worker-thinking-badge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mono">HIGH</span>
+              </div>
+              <p id="worker-status-sub" class="text-xs text-gray-400">Ожидание событий...</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="stopExecution()" class="px-3 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/30 text-xs font-medium transition">
+              ⏹ Остановить
+            </button>
+          </div>
+        </div>
+
+        <!-- Split Terminal / Thought Stream -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-[420px]">
+          
+          <!-- Left: Thoughts stream (Рассуждения модели) -->
+          <div class="bg-gray-900 border border-gray-800 rounded-xl flex flex-col overflow-hidden shadow-lg">
+            <div class="px-4 py-2.5 border-b border-gray-800 bg-gray-950/40 flex items-center justify-between text-xs font-semibold text-gray-300">
+              <span class="flex items-center gap-1.5">🧠 Рассуждения Antigravity (Thoughts)</span>
+              <span class="text-[10px] text-gray-500">Внутренний монолог</span>
+            </div>
+            <div id="thoughts-container" class="flex-1 p-4 overflow-y-auto space-y-3 mono text-xs text-gray-300 leading-relaxed bg-[#080d1a]/50">
+              <div class="text-gray-500 italic text-[11px]">Мысли появятся по мере рассуждений агента...</div>
+            </div>
+          </div>
+
+          <!-- Right: Tool Calls & Output Terminal -->
+          <div class="bg-gray-900 border border-gray-800 rounded-xl flex flex-col overflow-hidden shadow-lg">
+            <div class="px-4 py-2.5 border-b border-gray-800 bg-gray-950/40 flex items-center justify-between text-xs font-semibold text-gray-300">
+              <span class="flex items-center gap-1.5">🛠 Вызовы инструментов & Терминал</span>
+              <span id="tool-count-badge" class="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">0 действий</span>
+            </div>
+            <div id="terminal-container" class="flex-1 p-4 overflow-y-auto space-y-2 mono text-xs text-gray-200 leading-tight bg-black/60">
+              <div class="text-gray-500 italic text-[11px]">Терминальные команды и правки файлов...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Git Diff & Results Card (Appears upon completion) -->
+        <div id="completion-card" class="hidden bg-gray-900 border border-emerald-500/30 rounded-xl p-5 shadow-2xl flex flex-col gap-3">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-3">
+            <div class="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
+              <span class="text-lg">🎉</span>
+              <span>Задача успешно завершена!</span>
+            </div>
+            
+            <!-- Quick Action Buttons -->
+            <div class="flex flex-wrap items-center gap-2" id="completion-action-buttons">
+              <button
+                onclick="openFolderInExplorer()"
+                class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-medium text-gray-200 border border-gray-700 transition flex items-center gap-1.5 shadow-sm"
+                title="Открыть рабочую папку в Проводнике Windows"
+              >
+                <span>📂</span> Открыть в Проводнике
+              </button>
+              
+              <button
+                id="btn-open-in-browser"
+                onclick="openResultInBrowser()"
+                class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white shadow-md shadow-emerald-600/30 transition flex items-center gap-1.5"
+                title="Открыть результат в веб-браузере"
+              >
+                <span>🌐</span> Открыть в браузере
+              </button>
+
+              <button
+                id="btn-serve-workspace"
+                onclick="serveWorkspaceNow()"
+                class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5"
+                title="Запустить локальный HTTP сервер на 8080"
+              >
+                <span>🚀</span> Запустить на localhost
+              </button>
+            </div>
+          </div>
+
+          <p id="completion-summary" class="text-xs text-gray-300"></p>
+
+          <!-- Files created pill list -->
+          <div id="completion-files-box" class="bg-gray-950/70 p-3 rounded-lg border border-gray-800 flex flex-col gap-2">
+            <span class="text-xs text-gray-400 font-medium">📄 Созданные / обновленные файлы в проекте:</span>
+            <div id="completion-files-list" class="flex flex-wrap gap-1.5 text-xs"></div>
+          </div>
+
+          <!-- Git diff summary -->
+          <div class="flex flex-col gap-1">
+            <span class="text-xs text-gray-400 font-medium">📊 Git Diff (Изменения кода):</span>
+            <div id="completion-git-diff" class="bg-black/60 p-3 rounded-lg mono text-[11px] text-gray-300 whitespace-pre-wrap max-h-40 overflow-y-auto border border-gray-800"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB: HISTORY ================= -->
+      <section id="tab-history" class="tab-pane hidden flex flex-col gap-4 max-w-4xl mx-auto w-full">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-bold text-white">История выполненных задач</h2>
+          <button onclick="loadHistoryView()" class="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-xs text-gray-300 transition">
+            🔄 Обновить
+          </button>
+        </div>
+        <div id="history-list-container" class="space-y-3">
+          <!-- Dynamically populated -->
+        </div>
+      </section>
+
+      <!-- ================= TAB: PLAYBOOKS ================= -->
+      <section id="tab-playbooks" class="tab-pane hidden flex flex-col gap-5 max-w-4xl mx-auto w-full">
+        <div class="flex flex-col gap-1">
+          <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+            <span>📋</span> Готовые шаблоны (Playbooks)
+          </h2>
+          <p class="text-xs text-gray-400">
+            Быстрые пресеты задач для генерации игровых модулей, детекции движений, платежей и тестирования.
+          </p>
+        </div>
+
+        <div id="playbooks-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- ================= TAB: SANDBOX & TESTS ================= -->
+      <section id="tab-sandbox" class="tab-pane hidden flex flex-col gap-6 max-w-4xl mx-auto w-full">
+        <div class="flex flex-col gap-1">
+          <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+            <span>🧪</span> Песочница и Тестирование (Studio Sandbox)
+          </h2>
+          <p class="text-xs text-gray-400">
+            Запуск автоматизированных тестов бэкенда, симуляция алгоритмов детекции движений и валидация конфигов.
+          </p>
+        </div>
+
+        <!-- Tool 1: Backend Jest Runner -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl flex flex-col gap-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <span>🛡️</span> Бэкенд & Интеграционные тесты (Jest / npm test)
+              </h3>
+              <p class="text-xs text-gray-400 mt-0.5">Проверка анти-чита, Telegram Stars вебхуков, Double-Spend защиты и авто-пингов.</p>
+            </div>
+            <button onclick="runBackendTests()" id="btn-run-backend-tests" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-lg shadow-indigo-600/30">
+              <span>▶</span> Запустить тесты
+            </button>
+          </div>
+          <div id="backend-tests-result" class="hidden rounded-lg bg-gray-950 border border-gray-800 p-4 font-mono text-xs">
+            <!-- Output -->
+          </div>
+        </div>
+
+        <!-- Tool 2: Motion Detector Simulator -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl flex flex-col gap-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <span>🏋️</span> Симулятор детекции поз (MediaPipe 1.2m Engine)
+              </h3>
+              <p class="text-xs text-gray-400 mt-0.5">Генерация синтетической синусоиды суставов для проверки алгоритма без камеры.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <select id="sim-exercise" class="bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
+                <option value="squat">Приседания (Squats 1.2m)</option>
+                <option value="pushup">Отжимания (Pushups)</option>
+              </select>
+              <input id="sim-reps" type="number" min="1" max="50" value="10" class="w-16 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-center text-white" />
+              <button onclick="runMotionSimulation()" id="btn-run-motion-sim" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/30">
+                <span>⚡</span> Симулировать
+              </button>
+            </div>
+          </div>
+          <div id="motion-sim-result" class="hidden rounded-lg bg-gray-950 border border-gray-800 p-4 text-xs">
+            <!-- Output -->
+          </div>
+        </div>
+
+        <!-- Tool 3: Lore & Narrative Validator -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl flex flex-col gap-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <span>📖</span> Валидатор JSON-конфигов сюжета (Lore Micro-Dosing)
+              </h3>
+              <p class="text-xs text-gray-400 mt-0.5">Проверка структуры splash_quotes.json, boss_dialogues.json и store_items_copy.json.</p>
+            </div>
+            <button onclick="runLoreValidation()" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-lg shadow-purple-600/30">
+              <span>🔍</span> Проверить конфиги
+            </button>
+          </div>
+          <div id="lore-val-result" class="hidden rounded-lg bg-gray-950 border border-gray-800 p-4 text-xs font-mono">
+            <!-- Output -->
+          </div>
+        </div>
+
+        <!-- Tool 4: Live Web Preview -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+              <span>🌐</span> Локальный веб-сервер и предпросмотр (Dev Preview)
+            </h3>
+            <p class="text-xs text-gray-400 mt-0.5">Запустить предпросмотр index.html и виджетов на localhost:8080.</p>
+          </div>
+          <button onclick="startWorkspaceServer()" class="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-lg shadow-cyan-600/30">
+            <span>🚀</span> Открыть превью
+          </button>
+        </div>
+      </section>
+
+      <!-- ================= TAB: GIT & GITHUB ================= -->
+      <section id="tab-git" class="tab-pane hidden flex flex-col gap-5 max-w-4xl mx-auto w-full">
+        <div class="flex flex-col gap-1">
+          <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+            <span>🐙</span> Git Ops & GitHub Manager
+          </h2>
+          <p class="text-xs text-gray-400">
+            Управление репозиторием, просмотр изменений и быстрая отправка коммитов в GitHub (RLafleet).
+          </p>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl flex flex-col gap-4">
+          <div class="flex items-center justify-between pb-3 border-b border-gray-800">
+            <div>
+              <div class="flex items-center gap-2">
+                <span id="git-branch-badge" class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono font-medium">Ветка: main</span>
+                <span id="git-remote-label" class="text-xs text-gray-400 font-mono">git@github.com:RLafleet/...</span>
+              </div>
+              <p id="git-last-commit" class="text-xs text-gray-500 mt-1 font-mono truncate max-w-md">Последний коммит: Загрузка...</p>
+            </div>
+            <button onclick="loadGitView()" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-300 transition flex items-center gap-1">
+              <span>🔄</span> Обновить статус
+            </button>
+          </div>
+
+          <!-- Changed files -->
+          <div class="flex flex-col gap-2">
+            <span class="text-xs text-gray-400 font-medium flex items-center justify-between">
+              <span>Измененные файлы:</span>
+              <span id="git-changed-count" class="text-indigo-400 mono">0 файлов</span>
+            </span>
+            <div id="git-files-list" class="max-h-48 overflow-y-auto bg-gray-950 rounded-lg p-3 border border-gray-800 font-mono text-xs text-gray-300">
+              <span class="text-gray-500 italic">Нет несохраненных изменений. Рабочая директория чиста.</span>
+            </div>
+          </div>
+
+          <!-- Commit & Push Form -->
+          <div class="flex flex-col gap-2 pt-2 border-t border-gray-800">
+            <label class="text-xs text-gray-400 font-medium">Сообщение коммита:</label>
+            <div class="flex gap-2">
+              <input id="git-commit-msg" type="text" placeholder="feat: implement new feature" value="feat: update project codebase" class="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 transition" />
+              <button onclick="commitAndPushGit()" id="btn-git-push" class="px-5 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-medium text-xs transition flex items-center gap-2 shadow-lg shadow-indigo-600/20">
+                <span>🚀</span> Commit & Push
+              </button>
+            </div>
+            <div id="git-action-result" class="hidden text-xs p-3 rounded-lg bg-gray-950 border border-gray-800 mt-2"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB: SETTINGS ================= -->
+      <section id="tab-settings" class="tab-pane hidden flex flex-col gap-6 max-w-2xl mx-auto w-full">
+        <div class="flex flex-col gap-1">
+          <h2 class="text-xl font-bold text-white">Настройки оркестратора</h2>
+          <p class="text-xs text-gray-400">Конфигурация Gemini API, моделей и движка исполнения Antigravity.</p>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl space-y-4">
+          <!-- Gemini API Key -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-300 mb-1.5">Gemini API Key</label>
+            <div class="flex items-center gap-2">
+              <input
+                type="password"
+                id="setting-gemini-key"
+                placeholder="AIzaSy... или AQ.Ab..."
+                class="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 mono outline-none focus:border-indigo-500"
+              />
+              <button
+                onclick="testApiKey()"
+                class="px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-indigo-300 font-medium transition"
+              >
+                Проверить
+              </button>
+            </div>
+            <p class="text-[11px] text-gray-500 mt-1">По ключу автоматически подтягиваются все доступные модели вашего аккаунта.</p>
+          </div>
+
+          <!-- Model selection -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-xs font-semibold text-gray-300">Модель оркестратора (Gemini)</label>
+              <button onclick="refreshModelsCatalog()" class="text-[11px] text-indigo-400 hover:underline">
+                🔄 Обновить список моделей
+              </button>
+            </div>
+            <select
+              id="setting-model-select"
+              class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 outline-none focus:border-indigo-500"
+            >
+              <!-- Dynamically populated from API -->
+            </select>
+          </div>
+
+          <!-- Default Thinking Level in settings -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-300 mb-1.5">Уровень рассуждений по умолчанию (Thinking Level)</label>
+            <select
+              id="setting-thinking-select"
+              class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 outline-none focus:border-indigo-500"
+            >
+              <option value="high">High (Максимальная глубина рассуждений · Рекомендуется)</option>
+              <option value="medium">Medium (Сбалансированный режим рассуждений)</option>
+              <option value="low">Low (Быстрый ответ, минимальные рассуждения)</option>
+              <option value="off">Off (Без цепочки рассуждений)</option>
+            </select>
+          </div>
+
+          <!-- Execution Mode -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-300 mb-1.5">Движок исполнения Antigravity</label>
+            <select
+              id="setting-exec-mode"
+              class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 outline-none focus:border-indigo-500"
+            >
+              <option value="auto">Auto (Официальный Python SDK, fallback на CLI)</option>
+              <option value="sdk">Официальный Python SDK (google-antigravity)</option>
+              <option value="cli">Antigravity CLI (agy.exe)</option>
+            </select>
+          </div>
+
+          <!-- Save Button -->
+          <div class="pt-3 border-t border-gray-800 flex justify-end">
+            <button
+              onclick="saveSettings()"
+              class="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition shadow-lg shadow-indigo-600/30"
+            >
+              Сохранить настройки
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    let appConfig = {};
+    let currentSpec = null;
+    let ws = null;
+    let toolCount = 0;
+    let availableModels = [];
+    let currentThinkingLevel = "high";
+
+    const API_BASE = window.location.origin;
+
+    async function init() {
+      await loadConfig();
+      await loadModelsCatalog();
+      loadHistoryView();
+
+      // Restore drafts from localStorage
+      const draftPrompt = localStorage.getItem('orchestrator_draft_prompt');
+      if (draftPrompt) {
+        const inputEl = document.getElementById('user-prompt-input');
+        if (inputEl) inputEl.value = draftPrompt;
+      }
+
+      const draftSpecStr = localStorage.getItem('orchestrator_draft_spec');
+      if (draftSpecStr) {
+        try {
+          currentSpec = JSON.parse(draftSpecStr);
+          renderSpecCard(currentSpec);
+        } catch (e) {}
+      }
+
+      // Auto-save prompt on user typing
+      const promptEl = document.getElementById('user-prompt-input');
+      if (promptEl) {
+        promptEl.addEventListener('input', () => {
+          localStorage.setItem('orchestrator_draft_prompt', promptEl.value);
+        });
+      }
+    }
+
+    async function loadConfig() {
+      try {
+        const res = await fetch(`${API_BASE}/api/config`);
+        appConfig = await res.json();
+        
+        document.getElementById('current-workspace-label').textContent = appConfig.default_workspace || "Не выбрана";
+        document.getElementById('setting-gemini-key').value = appConfig.gemini_api_key || "";
+        document.getElementById('setting-exec-mode').value = appConfig.execution_mode || "auto";
+        currentThinkingLevel = (appConfig.thinking_level || "high").toLowerCase();
+        setThinkingLevel(currentThinkingLevel, false);
+      } catch (e) {
+        console.error("Config load error", e);
+      }
+    }
+
+    async function loadModelsCatalog() {
+      const badge = document.getElementById('api-status-badge');
+      try {
+        const res = await fetch(`${API_BASE}/api/models`);
+        const data = await res.json();
+        if (data.ok && data.models) {
+          availableModels = data.models;
+          renderModelDropdowns(data.models);
+
+          const activeModelId = appConfig.orchestrator_model || "gemini-3.8-flash";
+          const activeModel = availableModels.find(m => m.id === activeModelId) || availableModels[0];
+
+          badge.className = "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald-950/40 text-emerald-400 border border-emerald-500/30";
+          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span>${activeModel.name} · ${currentThinkingLevel.toUpperCase()}</span>`;
+        } else {
+          badge.className = "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-yellow-950/40 text-yellow-400 border border-yellow-500/30";
+          badge.innerHTML = `<span>Укажите Gemini API Key</span>`;
+        }
+      } catch (e) {
+        badge.innerHTML = `<span>Ошибка связи</span>`;
+      }
+    }
+
+    function renderModelDropdowns(models) {
+      const taskSelect = document.getElementById('task-model-select');
+      const settingSelect = document.getElementById('setting-model-select');
+      taskSelect.innerHTML = "";
+      settingSelect.innerHTML = "";
+
+      // Group by category
+      const categories = {};
+      models.forEach(m => {
+        const cat = m.category || "Другие";
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(m);
+      });
+
+      const optAutoTask = document.createElement('option');
+      optAutoTask.value = "auto";
+      optAutoTask.textContent = "⚡ Auto (Оркестратор определит модель и Thinking сам)";
+      taskSelect.appendChild(optAutoTask);
+
+      for (const [catName, catModels] of Object.entries(categories)) {
+        const grpTask = document.createElement('optgroup');
+        grpTask.label = catName;
+        const grpSetting = document.createElement('optgroup');
+        grpSetting.label = catName;
+
+        catModels.forEach(m => {
+          const opt1 = document.createElement('option');
+          opt1.value = m.id;
+          const tagStr = m.tag ? ` [${m.tag}]` : '';
+          opt1.textContent = `${m.name}${tagStr}`;
+
+          const opt2 = opt1.cloneNode(true);
+          grpTask.appendChild(opt1);
+          grpSetting.appendChild(opt2);
+        });
+
+        taskSelect.appendChild(grpTask);
+        settingSelect.appendChild(grpSetting);
+      }
+
+      const activeId = appConfig.orchestrator_model || "auto";
+      taskSelect.value = activeId;
+      settingSelect.value = appConfig.orchestrator_model && appConfig.orchestrator_model !== 'auto' ? appConfig.orchestrator_model : "gemini-3.8-flash";
+      if (document.getElementById('setting-thinking-select')) {
+        document.getElementById('setting-thinking-select').value = currentThinkingLevel;
+      }
+    }
+
+    function handleTaskModelChange() {
+      const selectedId = document.getElementById('task-model-select').value;
+      appConfig.orchestrator_model = selectedId;
+      const modelObj = availableModels.find(m => m.id === selectedId);
+      if (modelObj && modelObj.default_thinking) {
+        setThinkingLevel(modelObj.default_thinking);
+      }
+      updateBadge();
+    }
+
+    function setThinkingLevel(level, saveToConfig = true) {
+      currentThinkingLevel = level.toLowerCase();
+      document.querySelectorAll('.think-pill').forEach(btn => {
+        btn.className = "think-pill px-2.5 py-1 rounded text-[11px] font-medium text-gray-400 hover:text-white transition";
+      });
+
+      const activeBtn = document.getElementById(`think-btn-${currentThinkingLevel}`);
+      if (activeBtn) {
+        activeBtn.className = "think-pill px-2.5 py-1 rounded text-[11px] font-medium transition bg-indigo-600 text-white shadow font-semibold";
+      }
+
+      if (saveToConfig) {
+        appConfig.thinking_level = currentThinkingLevel;
+        updateBadge();
+      }
+    }
+
+    function updateBadge() {
+      const badge = document.getElementById('api-status-badge');
+      const activeModelId = appConfig.orchestrator_model || "gemini-3.8-flash";
+      const activeModel = availableModels.find(m => m.id === activeModelId) || { name: activeModelId };
+      badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span>${activeModel.name} · ${currentThinkingLevel.toUpperCase()}</span>`;
+    }
+
+    async function refreshModelsCatalog() {
+      await loadModelsCatalog();
+      alert("Список доступных моделей успешно обновлен!");
+    }
+
+    async function selectFolderDialog() {
+      try {
+        const res = await fetch(`${API_BASE}/api/select_folder`, { method: "POST" });
+        const data = await res.json();
+        if (data.ok && data.path) {
+          appConfig.default_workspace = data.path;
+          document.getElementById('current-workspace-label').textContent = data.path;
+        }
+      } catch (e) {
+        alert("Ошибка выбора папки: " + e);
+      }
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.nav-btn').forEach(el => {
+        el.className = "nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800/60 transition";
+      });
+
+      const targetPane = document.getElementById(`tab-${tabId}`);
+      const targetBtn = document.getElementById(`tab-btn-${tabId}`);
+      if (targetPane) targetPane.classList.remove('hidden');
+      if (targetBtn) {
+        targetBtn.className = "nav-btn active flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-white bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 transition";
+      }
+
+      if (tabId === 'history') loadHistoryView();
+      if (tabId === 'playbooks') loadPlaybooksView();
+      if (tabId === 'git') loadGitView();
+    }
+
+    // --- PLAYBOOKS LOGIC ---
+    async function loadPlaybooksView() {
+      try {
+        const res = await fetch(`${API_BASE}/api/playbooks`);
+        const data = await res.json();
+        const container = document.getElementById('playbooks-container');
+        if (!container || !data.playbooks) return;
+        container.innerHTML = "";
+
+        data.playbooks.forEach(pb => {
+          const card = document.createElement('div');
+          card.className = "bg-gray-900 border border-gray-800 hover:border-indigo-500/50 transition rounded-xl p-4 flex flex-col justify-between gap-3 shadow-lg";
+          card.innerHTML = `
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-1.5">
+                <h4 class="text-sm font-bold text-white">${pb.title}</h4>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">${pb.category}</span>
+              </div>
+              <p class="text-xs text-gray-400 leading-relaxed">${pb.description}</p>
+            </div>
+            <button onclick="usePlaybook('${encodeURIComponent(pb.template)}')" class="mt-2 w-full py-2 px-3 rounded-lg bg-gray-800 hover:bg-indigo-600 text-xs font-medium text-gray-200 hover:text-white transition flex items-center justify-center gap-1.5">
+              <span>🚀</span> Вставить в задачу
+            </button>
+          `;
+          container.appendChild(card);
+        });
+      } catch (e) {
+        console.error("Playbooks load error:", e);
+      }
+    }
+
+    function usePlaybook(encodedTemplate) {
+      const template = decodeURIComponent(encodedTemplate);
+      const input = document.getElementById('user-prompt-input');
+      if (input) {
+        input.value = template;
+        localStorage.setItem('orchestrator_draft_prompt', template);
+      }
+      switchTab('new-task');
+    }
+
+    // --- TESTING & SANDBOX LOGIC ---
+    async function runBackendTests() {
+      const btn = document.getElementById('btn-run-backend-tests');
+      const box = document.getElementById('backend-tests-result');
+      btn.disabled = true;
+      btn.innerHTML = `<span>⏳</span> Тестирование...`;
+      box.classList.remove('hidden');
+      box.innerHTML = `<span class="text-indigo-400 animate-pulse">Запуск набора тестов в рабочей папке: ${appConfig.default_workspace}...</span>`;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/test/backend`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workspace_path: appConfig.default_workspace })
+        });
+        const data = await res.json();
+        const isOk = data.ok;
+
+        box.innerHTML = `
+          <div class="flex items-center justify-between pb-2 mb-2 border-b border-gray-800">
+            <span class="font-bold ${isOk ? 'text-emerald-400' : 'text-red-400'}">${isOk ? '✓ ВСЕ ТЕСТЫ ПРОЙДЕНЫ' : '✕ ТЕСТЫ ЗАВЕРШИЛИСЬ С ОШИБКОЙ'}</span>
+            <span class="text-gray-500">Команда: ${data.command || 'test'}</span>
+          </div>
+          <pre class="whitespace-pre-wrap text-[11px] text-gray-300 max-h-60 overflow-y-auto">${data.output || data.summary}</pre>
+        `;
+      } catch (e) {
+        box.innerHTML = `<span class="text-red-400">Ошибка запуска тестов: ${e}</span>`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>▶</span> Запустить тесты`;
+      }
+    }
+
+    async function runMotionSimulation() {
+      const btn = document.getElementById('btn-run-motion-sim');
+      const box = document.getElementById('motion-sim-result');
+      const exercise = document.getElementById('sim-exercise').value;
+      const reps = parseInt(document.getElementById('sim-reps').value) || 10;
+
+      btn.disabled = true;
+      btn.innerHTML = `<span>⏳</span> Симуляция...`;
+      box.classList.remove('hidden');
+
+      try {
+        const res = await fetch(`${API_BASE}/api/test/motion`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ exercise, reps })
+        });
+        const data = await res.json();
+
+        box.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-3 mb-3 border-b border-gray-800">
+            <div class="flex items-center gap-2">
+              <span class="text-xs px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">Точность: ${data.accuracy_pct}%</span>
+              <span class="text-white font-semibold">Засчитано: ${data.counted_reps} из ${data.target_reps}</span>
+            </div>
+            <span class="text-xs text-gray-400 italic">${data.verdict}</span>
+          </div>
+          <p class="text-xs text-gray-400 mb-2">Кадров обработано: ${data.total_simulated_frames}. Алгоритм V13.2 Upper-Body & Hip успешно отфильтровал промежуточные фазы.</p>
+        `;
+      } catch (e) {
+        box.innerHTML = `<span class="text-red-400">Ошибка симуляции: ${e}</span>`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>⚡</span> Симулировать`;
+      }
+    }
+
+    async function runLoreValidation() {
+      const box = document.getElementById('lore-val-result');
+      box.classList.remove('hidden');
+      box.innerHTML = `<span class="text-purple-400">Сканирование JSON-файлов нарратива...</span>`;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/test/lore`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workspace_path: appConfig.default_workspace })
+        });
+        const data = await res.json();
+
+        let details = "";
+        if (data.found_configs) {
+          for (const [k, v] of Object.entries(data.found_configs)) {
+            details += `<div class="text-emerald-400">✓ ${k} &rarr; ${v.status} (элементов: ${v.item_count})</div>`;
+          }
+        }
+        if (data.missing_files && data.missing_files.length > 0) {
+          data.missing_files.forEach(f => {
+            details += `<div class="text-red-400">✕ Отсутствует: ${f}</div>`;
+          });
+        }
+
+        box.innerHTML = `
+          <div class="font-bold text-white mb-1.5">${data.summary}</div>
+          <div class="space-y-1">${details}</div>
+        `;
+      } catch (e) {
+        box.innerHTML = `<span class="text-red-400">Ошибка валидации: ${e}</span>`;
+      }
+    }
+
+    async function startWorkspaceServer() {
+      try {
+        const res = await fetch(`${API_BASE}/api/serve_workspace`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: appConfig.default_workspace })
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          alert("Не удалось запустить превью: " + (data.error || "Неизвестная ошибка"));
+        }
+      } catch (e) {
+        alert("Сетевая ошибка: " + e);
+      }
+    }
+
+    // --- GIT LOGIC ---
+    async function loadGitView() {
+      try {
+        const res = await fetch(`${API_BASE}/api/git/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workspace_path: appConfig.default_workspace })
+        });
+        const data = await res.json();
+
+        document.getElementById('git-branch-badge').textContent = `Ветка: ${data.branch || 'main'}`;
+        document.getElementById('git-remote-label').textContent = data.remote || 'git@github.com:RLafleet/...';
+        document.getElementById('git-last-commit').textContent = `Последний коммит: ${data.last_commit || 'Нет коммитов'}`;
+        document.getElementById('git-changed-count').textContent = `${data.changed_count || 0} файлов`;
+
+        const listEl = document.getElementById('git-files-list');
+        if (data.changed_files && data.changed_files.length > 0) {
+          listEl.innerHTML = data.changed_files.map(f => `<div class="py-0.5">${f}</div>`).join('');
+        } else {
+          listEl.innerHTML = `<span class="text-gray-500 italic">Нет несохраненных изменений. Рабочая директория чиста.</span>`;
+        }
+      } catch (e) {
+        console.error("Git load error:", e);
+      }
+    }
+
+    async function commitAndPushGit() {
+      const msg = document.getElementById('git-commit-msg').value.trim();
+      if (!msg) {
+        alert("Пожалуйста, введите сообщение коммита.");
+        return;
+      }
+
+      const btn = document.getElementById('btn-git-push');
+      const resBox = document.getElementById('git-action-result');
+      btn.disabled = true;
+      btn.innerHTML = `<span>⏳</span> Отправка в GitHub...`;
+      resBox.classList.remove('hidden');
+      resBox.innerHTML = `<span class="text-indigo-400 animate-pulse">Выполняется git add, commit и push на GitHub...</span>`;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/git/commit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workspace_path: appConfig.default_workspace,
+            message: msg,
+            push: true
+          })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+          resBox.className = "text-xs p-3 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-300";
+          resBox.innerHTML = `<span>✓ ${data.message}</span>`;
+          loadGitView();
+        } else {
+          resBox.className = "text-xs p-3 rounded-lg bg-red-950/40 border border-red-500/30 text-red-300";
+          resBox.innerHTML = `<span>✕ ${data.error || 'Ошибка push'}</span>`;
+        }
+      } catch (e) {
+        resBox.className = "text-xs p-3 rounded-lg bg-red-950/40 border border-red-500/30 text-red-300";
+        resBox.innerHTML = `<span>✕ Ошибка связи: ${e}</span>`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>🚀</span> Commit & Push`;
+      }
+    }
+
+    function applyPreset(type) {
+      const textarea = document.getElementById('user-prompt-input');
+      const presets = {
+        bug: "Найди и исправь ошибку в обработке запросов. Проверь логи, устрани причину и добавь тест для предотвращения регрессии.",
+        feature: "Реализуй новый функционал с валидацией входных данных и покрытием юнит-тестами.",
+        test: "Напиши всесторонние юнит и интеграционные тесты для ключевых модулей проекта.",
+        refactor: "Проведи рефакторинг кода: вынеси дублирующуюся логику в хелперы, улучши читаемость без изменения публичного API."
+      };
+      textarea.value = presets[type] || "";
+      textarea.focus();
+    }
+
+    async function handleArchitectAndRun(autoExecute) {
+      const prompt = document.getElementById('user-prompt-input').value.trim();
+      if (!prompt) {
+        alert("Пожалуйста, введите описание задачи.");
+        return;
+      }
+
+      const workspace = appConfig.default_workspace;
+      if (!workspace) {
+        alert("Пожалуйста, выберите рабочую папку проекта.");
+        return;
+      }
+
+      const selectedModel = document.getElementById('task-model-select').value;
+      const btnAuto = document.getElementById('btn-auto-run');
+      const btnReview = document.getElementById('btn-review-spec');
+      btnAuto.disabled = true;
+      btnReview.disabled = true;
+      btnAuto.innerHTML = `<span>⏳ Gemini Tech Lead (${currentThinkingLevel.toUpperCase()}) проектирует задачу...</span>`;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/architect`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_prompt: prompt,
+            workspace_path: workspace,
+            model_name: selectedModel,
+            thinking_level: currentThinkingLevel
+          })
+        });
+        const data = await res.json();
+
+        if (!data.ok) {
+          alert("Ошибка создания спецификации: " + (data.error || "Неизвестная ошибка"));
+          return;
+        }
+
+        currentSpec = data.spec;
+        localStorage.setItem('orchestrator_draft_spec', JSON.stringify(data.spec));
+
+        if (data.spec.auto_selection && (selectedModel === 'auto' || !selectedModel)) {
+          const auto = data.spec.auto_selection;
+          if (auto.thinking) setThinkingLevel(auto.thinking, false);
+          if (auto.model) {
+            document.getElementById('task-model-select').value = auto.model;
+          }
+        }
+
+        renderSpecCard(data.spec);
+
+        if (autoExecute || document.getElementById('auto-run-checkbox').checked) {
+          executeCurrentSpec();
+        }
+      } catch (e) {
+        alert("Сетевая ошибка: " + e);
+      } finally {
+        btnAuto.disabled = false;
+        btnReview.disabled = false;
+        btnAuto.innerHTML = `<span>⚡ Запустить задачу</span>`;
+      }
+    }
+
+    function renderSpecCard(spec) {
+      const card = document.getElementById('spec-result-card');
+      card.classList.remove('hidden');
+
+      document.getElementById('spec-title').textContent = spec.title || "Technical Task";
+      document.getElementById('spec-title-ru').textContent = spec.title_ru || "";
+      document.getElementById('spec-objective').textContent = spec.objective || "";
+      
+      const filesContainer = document.getElementById('spec-files');
+      filesContainer.innerHTML = "";
+      
+      const toModify = spec.target_files_to_modify || [];
+      const toCreate = spec.target_files_to_create || [];
+
+      toModify.forEach(f => {
+        filesContainer.innerHTML += `<span class="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-300 border border-yellow-500/20">✎ ${f}</span>`;
+      });
+      toCreate.forEach(f => {
+        filesContainer.innerHTML += `<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">+ ${f}</span>`;
+      });
+
+      const savings = spec.token_savings_analysis || {};
+      const tokensSaved = savings.total_estimated_tokens_saved || 50000;
+      const pctSaved = savings.language_compression_pct || 55;
+      document.getElementById('token-savings-text').textContent = `Сэкономлено ~${tokensSaved.toLocaleString()} токенов контекста (${savings.summary_ru || ''})`;
+      document.getElementById('token-pct-saved').textContent = `~${pctSaved}% экономии`;
+
+      document.getElementById('spec-antigravity-prompt').textContent = spec.antigravity_prompt || "";
+    }
+
+    function executeCurrentSpec() {
+      if (!currentSpec) return;
+
+      switchTab('monitor');
+      document.getElementById('monitor-badge').classList.remove('hidden');
+      document.getElementById('completion-card').classList.add('hidden');
+
+      // Clear streams
+      document.getElementById('thoughts-container').innerHTML = "";
+      document.getElementById('terminal-container').innerHTML = "";
+      toolCount = 0;
+      document.getElementById('tool-count-badge').textContent = `0 действий`;
+
+      const selectedModel = document.getElementById('task-model-select').value;
+      const modelObj = availableModels.find(m => m.id === selectedModel) || { name: selectedModel };
+
+      document.getElementById('worker-status-title').textContent = currentSpec.title_ru || currentSpec.title || "Выполнение";
+      document.getElementById('worker-model-badge').textContent = modelObj.name;
+      document.getElementById('worker-thinking-badge').textContent = currentThinkingLevel.toUpperCase();
+      document.getElementById('worker-status-sub').textContent = "Подключение к Antigravity...";
+
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/execute`);
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          task_id: currentSpec.task_id,
+          antigravity_prompt: currentSpec.antigravity_prompt,
+          workspace_path: appConfig.default_workspace,
+          title_ru: currentSpec.title_ru || currentSpec.title,
+          model_name: selectedModel,
+          thinking_level: currentThinkingLevel,
+          verification_commands: currentSpec.verification_commands || [],
+          token_stats: currentSpec.token_savings_analysis || {}
+        }));
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        handleWorkerEvent(msg);
+      };
+
+      ws.onclose = () => {
+        document.getElementById('monitor-badge').classList.add('hidden');
+        document.getElementById('worker-status-spinner').classList.add('hidden');
+      };
+    }
+
+    function handleWorkerEvent(msg) {
+      const type = msg.event;
+
+      if (type === 'status') {
+        document.getElementById('worker-status-sub').textContent = msg.message;
+        if (msg.model) {
+          document.getElementById('worker-model-badge').textContent = msg.model;
+        }
+        if (msg.thinking) {
+          document.getElementById('worker-thinking-badge').textContent = msg.thinking.toUpperCase();
+        }
+      } else if (type === 'thought') {
+        const container = document.getElementById('thoughts-container');
+        const el = document.createElement('div');
+        el.className = "p-2.5 rounded-lg bg-indigo-950/30 border border-indigo-500/20 text-indigo-200 text-xs";
+        el.textContent = msg.thought;
+        container.appendChild(el);
+        container.scrollTop = container.scrollHeight;
+      } else if (type === 'tool' || type === 'log') {
+        toolCount++;
+        document.getElementById('tool-count-badge').textContent = `${toolCount} действий`;
+        const container = document.getElementById('terminal-container');
+        const el = document.createElement('div');
+        el.className = "text-emerald-400 font-mono text-[11px] border-l-2 border-emerald-500 pl-2";
+        el.textContent = msg.tool || msg.text;
+        container.appendChild(el);
+        container.scrollTop = container.scrollHeight;
+      } else if (type === 'token') {
+        const container = document.getElementById('terminal-container');
+        const span = document.createElement('span');
+        span.className = "text-gray-200 text-xs";
+        span.textContent = msg.token;
+        container.appendChild(span);
+        container.scrollTop = container.scrollHeight;
+      } else if (type === 'verification') {
+        const container = document.getElementById('terminal-container');
+        const el = document.createElement('div');
+        const isPassed = msg.status === 'passed';
+        el.className = `p-2 rounded text-xs mono ${isPassed ? 'bg-emerald-950/40 text-emerald-300' : 'bg-red-950/40 text-red-300'}`;
+        el.innerHTML = `<b>${isPassed ? '✓' : '✗'} [Test] ${msg.command}:</b> ${msg.output || msg.status}`;
+        container.appendChild(el);
+        container.scrollTop = container.scrollHeight;
+      } else if (type === 'completed') {
+        latestCompletedEvent = msg;
+        document.getElementById('worker-status-sub').textContent = "Завершено успешно";
+        const card = document.getElementById('completion-card');
+        card.classList.remove('hidden');
+        document.getElementById('completion-summary').textContent = msg.message;
+
+        // Scan terminal text for detected localhost URL
+        const termText = document.getElementById('terminal-container').innerText;
+        const urlMatch = termText.match(/http:\/\/(localhost|127\.0\.0\.1):(\d+)/i);
+        if (urlMatch) {
+          latestCompletedEvent.detected_url = urlMatch[0];
+        }
+
+        // Render created files list
+        const filesList = document.getElementById('completion-files-list');
+        filesList.innerHTML = "";
+        const files = msg.files || (currentSpec ? currentSpec.target_files_to_create : []) || [];
+        if (files.length > 0) {
+          files.forEach(f => {
+            filesList.innerHTML += `<span class="px-2 py-0.5 rounded bg-gray-900 border border-emerald-500/30 text-emerald-300 font-mono text-[11px] flex items-center gap-1">📄 ${f}</span>`;
+          });
+          document.getElementById('completion-files-box').classList.remove('hidden');
+        } else {
+          document.getElementById('completion-files-box').classList.add('hidden');
+        }
+
+        // Toggle browser button label and visibility
+        const btnBrowser = document.getElementById('btn-open-in-browser');
+        if (latestCompletedEvent.detected_url) {
+          btnBrowser.innerHTML = `<span>🌐</span> Открыть в браузере (${latestCompletedEvent.detected_url})`;
+          btnBrowser.classList.remove('hidden');
+        } else if (msg.has_index_html) {
+          btnBrowser.innerHTML = `<span>🌐</span> Открыть index.html`;
+          btnBrowser.classList.remove('hidden');
+        } else {
+          btnBrowser.classList.add('hidden');
+        }
+
+        if (msg.git_changes && msg.git_changes.diff_stat) {
+          document.getElementById('completion-git-diff').textContent = msg.git_changes.diff_stat;
+        } else {
+          document.getElementById('completion-git-diff').textContent = "Файлы успешно созданы/обновлены в рабочей папке проекта.";
+        }
+      } else if (type === 'error') {
+        document.getElementById('worker-status-sub').textContent = "Ошибка: " + msg.error;
+      }
+    }
+
+    let latestCompletedEvent = null;
+
+    async function openFolderInExplorer(path) {
+      const targetPath = path || appConfig.default_workspace;
+      try {
+        const res = await fetch(`${API_BASE}/api/open_folder`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: targetPath })
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          alert("Не удалось открыть папку: " + (data.error || "Неизвестная ошибка"));
+        }
+      } catch (e) {
+        alert("Сетевая ошибка: " + e);
+      }
+    }
+
+    async function openResultInBrowser(urlOrPath) {
+      let targetUrl = urlOrPath;
+      let targetPath = null;
+      if (!targetUrl && latestCompletedEvent) {
+        if (latestCompletedEvent.detected_url) {
+          targetUrl = latestCompletedEvent.detected_url;
+        } else if (latestCompletedEvent.has_index_html) {
+          targetPath = `${latestCompletedEvent.workspace_path || appConfig.default_workspace}/index.html`;
+        }
+      }
+      try {
+        await fetch(`${API_BASE}/api/open_browser`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: targetUrl, path: targetPath })
+        });
+      } catch (e) {
+        alert("Ошибка открытия браузера: " + e);
+      }
+    }
+
+    async function serveWorkspaceNow() {
+      const btn = document.getElementById('btn-serve-workspace');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = `<span>⏳</span> Запуск...`;
+      try {
+        const res = await fetch(`${API_BASE}/api/serve_workspace`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: appConfig.default_workspace })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          btn.innerHTML = `<span>✓</span> Открыто (${data.url})`;
+        } else {
+          alert("Ошибка запуска сервера: " + (data.error || "Не удалось запустить"));
+          btn.innerHTML = originalText;
+        }
+      } catch (e) {
+        alert("Сетевая ошибка: " + e);
+        btn.innerHTML = originalText;
+      }
+    }
+
+    async function stopExecution() {
+      if (ws) ws.close();
+      await fetch(`${API_BASE}/api/stop`, { method: "POST" });
+    }
+
+    async function loadHistoryView() {
+      try {
+        const res = await fetch(`${API_BASE}/api/history`);
+        const list = await res.json();
+        const container = document.getElementById('history-list-container');
+        container.innerHTML = "";
+
+        if (!list || list.length === 0) {
+          container.innerHTML = `<div class="p-8 text-center text-gray-500 text-xs italic bg-gray-900 border border-gray-800 rounded-xl">История задач пока пуста. Поставьте первую задачу во вкладке «Новая задача»!</div>`;
+          return;
+        }
+
+        list.forEach(item => {
+          const isDone = item.status === 'completed';
+          const isSpecReady = item.status === 'spec_ready';
+          const isRunning = item.status === 'running';
+
+          let statusBadge = '';
+          if (isDone) {
+            statusBadge = `<span class="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">✓ Выполнено</span>`;
+          } else if (isSpecReady) {
+            statusBadge = `<span class="text-xs px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">📋 Спецификация готова</span>`;
+          } else if (isRunning) {
+            statusBadge = `<span class="text-xs px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-medium animate-pulse">⏳ В процессе</span>`;
+          } else {
+            statusBadge = `<span class="text-xs px-2 py-0.5 rounded bg-gray-500/10 text-gray-400 border border-gray-500/20 font-medium">${item.status}</span>`;
+          }
+
+          const hasWeb = item.detected_url || item.has_index_html;
+          const targetUrl = item.detected_url || (item.workspace ? `${item.workspace}/index.html` : null);
+          const safeWorkspace = (item.workspace || '').replace(/\\/g, '\\\\');
+          const safeTargetUrl = targetUrl ? targetUrl.replace(/\\/g, '\\\\') : '';
+
+          container.innerHTML += `
+            <div class="bg-gray-900 border border-gray-800 hover:border-gray-700 transition rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-lg">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  ${statusBadge}
+                  <h4 class="text-sm font-semibold text-white truncate">${item.title || 'Задача'}</h4>
+                  ${item.timestamp ? `<span class="text-[11px] text-gray-500 font-mono">${item.timestamp}</span>` : ''}
+                </div>
+                <p class="text-xs text-gray-400 mt-1 mono truncate max-w-lg">📁 ${item.workspace || 'Workspace'}</p>
+                ${item.token_stats ? `
+                  <div class="text-[11px] text-indigo-400/90 mt-1 flex items-center gap-1 font-medium">
+                    <span>🔥</span> Сэкономлено ~${(item.token_stats.total_estimated_tokens_saved || 50000).toLocaleString()} токенов
+                  </div>` : ''}
+              </div>
+
+              <!-- History Card Action Buttons -->
+              <div class="flex items-center gap-2 shrink-0 flex-wrap">
+                <button
+                  onclick="loadTaskIntoEditor('${item.id}')"
+                  class="px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-medium text-gray-200 border border-gray-700 transition flex items-center gap-1"
+                  title="Восстановить задачу и спеку в редакторе"
+                >
+                  <span>👀</span> В редактор
+                </button>
+
+                ${isSpecReady ? `
+                <button
+                  onclick="runTaskFromHistory('${item.id}')"
+                  class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-md shadow-indigo-600/20 transition flex items-center gap-1"
+                  title="Запустить задачу в Antigravity"
+                >
+                  <span>▶</span> Запустить
+                </button>
+                ` : ''}
+
+                <button
+                  onclick="openFolderInExplorer('${safeWorkspace}')"
+                  class="px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-medium text-emerald-400 border border-gray-700 transition flex items-center gap-1"
+                  title="Открыть папку проекта в Проводнике Windows"
+                >
+                  <span>📂</span> Проводник
+                </button>
+
+                ${hasWeb ? `
+                <button
+                  onclick="openResultInBrowser('${safeTargetUrl}')"
+                  class="px-2.5 py-1.5 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-xs font-medium text-emerald-200 border border-emerald-500/30 transition flex items-center gap-1"
+                  title="Открыть в веб-браузере"
+                >
+                  <span>🌐</span> Открыть
+                </button>` : ''}
+
+                <button
+                  onclick="deleteTaskFromHistory('${item.id}')"
+                  class="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition text-xs"
+                  title="Удалить из истории"
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+          `;
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadTaskIntoEditor(taskId) {
+      try {
+        const res = await fetch(`${API_BASE}/api/history`);
+        const list = await res.json();
+        const task = list.find(t => t.id === taskId);
+        if (!task) return;
+
+        switchTab('new-task');
+        if (task.user_prompt) {
+          document.getElementById('user-prompt-input').value = task.user_prompt;
+          localStorage.setItem('orchestrator_draft_prompt', task.user_prompt);
+        }
+        if (task.workspace) {
+          appConfig.default_workspace = task.workspace;
+          document.getElementById('current-workspace-label').textContent = task.workspace;
+        }
+        if (task.model_name) {
+          document.getElementById('task-model-select').value = task.model_name;
+        }
+        if (task.thinking_level) {
+          setThinkingLevel(task.thinking_level, false);
+        }
+        if (task.spec) {
+          currentSpec = task.spec;
+          localStorage.setItem('orchestrator_draft_spec', JSON.stringify(task.spec));
+          renderSpecCard(task.spec);
+        }
+      } catch (e) {
+        alert("Ошибка загрузки задачи: " + e);
+      }
+    }
+
+    async function runTaskFromHistory(taskId) {
+      await loadTaskIntoEditor(taskId);
+      executeCurrentSpec();
+    }
+
+    async function deleteTaskFromHistory(taskId) {
+      if (!confirm("Удалить эту задачу из истории?")) return;
+      try {
+        await fetch(`${API_BASE}/api/history/${taskId}`, { method: "DELETE" });
+        await loadHistoryView();
+      } catch (e) {
+        alert("Ошибка удаления: " + e);
+      }
+    }
+
+    async function testApiKey() {
+      const key = document.getElementById('setting-gemini-key').value.trim();
+      const res = await fetch(`${API_BASE}/api/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gemini_api_key: key })
+      });
+      await loadConfig();
+      await loadModelsCatalog();
+      alert("Проверка выполнена. Список моделей успешно обновлен из API.");
+    }
+
+    async function saveSettings() {
+      const key = document.getElementById('setting-gemini-key').value.trim();
+      const model = document.getElementById('setting-model-select').value;
+      const thinking = document.getElementById('setting-thinking-select').value;
+      const mode = document.getElementById('setting-exec-mode').value;
+
+      await fetch(`${API_BASE}/api/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gemini_api_key: key,
+          orchestrator_model: model,
+          thinking_level: thinking,
+          execution_mode: mode
+        })
+      });
+      await loadConfig();
+      await loadModelsCatalog();
+      alert("Настройки успешно сохранены!");
+    }
+
+    // Startup
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
