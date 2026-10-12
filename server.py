@@ -24,7 +24,7 @@ from spec_architect import (
 from worker_engine import WorkerEngine
 from test_engine import (
     run_backend_tests, simulate_motion_counter,
-    validate_narrative_configs
+    validate_narrative_configs, run_custom_command
 )
 from git_manager import get_git_status, git_commit_and_push
 
@@ -79,6 +79,19 @@ class GitCommitRequest(BaseModel):
     push: bool = True
 
 
+class CustomCommandRequest(BaseModel):
+    command: str
+    workspace_path: str
+
+
+class PlaybookModel(BaseModel):
+    id: str
+    title: str
+    category: str
+    description: str
+    template: str
+
+
 # --- Endpoints ---
 
 @app.get("/api/config")
@@ -126,6 +139,37 @@ async def save_playbooks_endpoint(req: List[Dict[str, Any]]):
         with open(PLAYBOOKS_FILE, "w", encoding="utf-8") as f:
             json.dump(req, f, indent=2, ensure_ascii=False)
         return {"ok": True, "playbooks": req}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/playbooks/add")
+async def add_playbook_endpoint(item: PlaybookModel):
+    current = get_playbooks()
+    updated = False
+    for idx, pb in enumerate(current):
+        if pb.get("id") == item.id:
+            current[idx] = item.dict()
+            updated = True
+            break
+    if not updated:
+        current.insert(0, item.dict())
+    try:
+        with open(PLAYBOOKS_FILE, "w", encoding="utf-8") as f:
+            json.dump(current, f, indent=2, ensure_ascii=False)
+        return {"ok": True, "playbooks": current}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.delete("/api/playbooks/{playbook_id}")
+async def delete_playbook_endpoint(playbook_id: str):
+    current = get_playbooks()
+    filtered = [pb for pb in current if pb.get("id") != playbook_id]
+    try:
+        with open(PLAYBOOKS_FILE, "w", encoding="utf-8") as f:
+            json.dump(filtered, f, indent=2, ensure_ascii=False)
+        return {"ok": True, "playbooks": filtered}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
@@ -223,6 +267,12 @@ async def test_motion(req: MotionTestRequest):
 async def test_lore(req: ScanRequest):
     """Validates narrative JSON files."""
     return validate_narrative_configs(req.workspace_path)
+
+
+@app.post("/api/test/custom")
+async def test_custom(req: CustomCommandRequest):
+    """Executes any custom test or build command."""
+    return await run_custom_command(req.command, req.workspace_path)
 
 
 # --- Git Endpoints ---

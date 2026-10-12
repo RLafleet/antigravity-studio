@@ -154,3 +154,25 @@ def validate_narrative_configs(workspace_path: str) -> Dict[str, Any]:
         "missing_files": missing,
         "summary": "Все JSON-конфиги лора валидны и на месте!" if not missing else f"Не найдены файлы: {', '.join(missing)}"
     }
+
+
+async def run_custom_command(command: str, workspace_path: str) -> Dict[str, Any]:
+    """Runs any custom test, build, or script command in the workspace."""
+    try:
+        proc = await asyncio.create_subprocess_shell(
+            command,
+            cwd=workspace_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        raw_output = stdout.decode("utf-8", errors="ignore") + stderr.decode("utf-8", errors="ignore")
+        return {
+            "ok": proc.returncode == 0,
+            "exit_code": proc.returncode,
+            "command": command,
+            "output": raw_output[-3000:]
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e), "command": command}
+

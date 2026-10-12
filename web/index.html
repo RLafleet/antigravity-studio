@@ -409,13 +409,33 @@
 
       <!-- ================= TAB: PLAYBOOKS ================= -->
       <section id="tab-playbooks" class="tab-pane hidden flex flex-col gap-5 max-w-4xl mx-auto w-full">
-        <div class="flex flex-col gap-1">
-          <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <span>📋</span> Готовые шаблоны (Playbooks)
-          </h2>
-          <p class="text-xs text-gray-400">
-            Быстрые пресеты задач для генерации игровых модулей, детекции движений, платежей и тестирования.
-          </p>
+        <div class="flex items-center justify-between">
+          <div class="flex flex-col gap-1">
+            <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+              <span>📋</span> Готовые шаблоны (Playbooks)
+            </h2>
+            <p class="text-xs text-gray-400">
+              Быстрые пресеты задач для генерации модулей, детекции движений, платежей и тестирования.
+            </p>
+          </div>
+          <button onclick="toggleNewPlaybookForm()" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-lg shadow-indigo-600/30">
+            <span>+</span> Новый шаблон
+          </button>
+        </div>
+
+        <!-- Add Playbook Form (Collapsible) -->
+        <div id="new-playbook-form" class="hidden bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl flex flex-col gap-3">
+          <h3 class="text-sm font-bold text-white">Создать собственный шаблон</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input id="new-pb-title" type="text" placeholder="Название (например, 📦 Новый микросервис)" class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white" />
+            <input id="new-pb-cat" type="text" placeholder="Категория (например, Backend / API)" class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white" />
+          </div>
+          <input id="new-pb-desc" type="text" placeholder="Краткое описание" class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white" />
+          <textarea id="new-pb-template" rows="2" placeholder="Текст промпта для вставки в задачу..." class="bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs text-white"></textarea>
+          <div class="flex justify-end gap-2">
+            <button onclick="toggleNewPlaybookForm()" class="px-3 py-1.5 rounded-lg bg-gray-800 text-xs text-gray-400 hover:text-white">Отмена</button>
+            <button onclick="saveNewPlaybook()" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs text-white font-medium">Сохранить</button>
+          </div>
         </div>
 
         <div id="playbooks-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -495,7 +515,28 @@
           </div>
         </div>
 
-        <!-- Tool 4: Live Web Preview -->
+        <!-- Tool 4: Custom Shell / Test Runner -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <span>💻</span> Произвольная команда терминала (Custom Command Runner)
+              </h3>
+              <p class="text-xs text-gray-400 mt-0.5">Выполнить любую команду (npm, python, flutter, curl, pytest) в рабочей директории.</p>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <input id="custom-cmd-input" type="text" placeholder="например: npm run build, python test.py, flutter analyze" class="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white mono focus:outline-none focus:border-indigo-500 transition" />
+            <button onclick="runCustomCommandFromUi()" id="btn-run-custom-cmd" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-lg shadow-indigo-600/30">
+              <span>▶</span> Выполнить
+            </button>
+          </div>
+          <div id="custom-cmd-result" class="hidden rounded-lg bg-gray-950 border border-gray-800 p-4 font-mono text-xs">
+            <!-- Output -->
+          </div>
+        </div>
+
+        <!-- Tool 5: Live Web Preview -->
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl flex items-center justify-between">
           <div>
             <h3 class="text-sm font-semibold text-white flex items-center gap-2">
@@ -852,12 +893,17 @@
 
         data.playbooks.forEach(pb => {
           const card = document.createElement('div');
-          card.className = "bg-gray-900 border border-gray-800 hover:border-indigo-500/50 transition rounded-xl p-4 flex flex-col justify-between gap-3 shadow-lg";
+          card.className = "bg-gray-900 border border-gray-800 hover:border-indigo-500/50 transition rounded-xl p-4 flex flex-col justify-between gap-3 shadow-lg relative group";
           card.innerHTML = `
             <div>
               <div class="flex items-center justify-between gap-2 mb-1.5">
                 <h4 class="text-sm font-bold text-white">${pb.title}</h4>
-                <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">${pb.category}</span>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">${pb.category}</span>
+                  <button onclick="deletePlaybook('${pb.id}')" title="Удалить шаблон" class="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-gray-800 transition text-xs opacity-0 group-hover:opacity-100">
+                    🗑️
+                  </button>
+                </div>
               </div>
               <p class="text-xs text-gray-400 leading-relaxed">${pb.description}</p>
             </div>
@@ -872,6 +918,49 @@
       }
     }
 
+    function toggleNewPlaybookForm() {
+      const form = document.getElementById('new-playbook-form');
+      form.classList.toggle('hidden');
+    }
+
+    async function saveNewPlaybook() {
+      const title = document.getElementById('new-pb-title').value.trim();
+      const cat = document.getElementById('new-pb-cat').value.trim() || 'Custom';
+      const desc = document.getElementById('new-pb-desc').value.trim();
+      const template = document.getElementById('new-pb-template').value.trim();
+
+      if (!title || !template) {
+        alert("Укажите название и текст промпта.");
+        return;
+      }
+
+      const id = 'custom_' + Date.now();
+      try {
+        await fetch(`${API_BASE}/api/playbooks/add`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, title, category: cat, description: desc, template })
+        });
+        document.getElementById('new-pb-title').value = '';
+        document.getElementById('new-pb-desc').value = '';
+        document.getElementById('new-pb-template').value = '';
+        toggleNewPlaybookForm();
+        loadPlaybooksView();
+      } catch (e) {
+        alert("Ошибка сохранения: " + e);
+      }
+    }
+
+    async function deletePlaybook(id) {
+      if (!confirm("Удалить этот шаблон?")) return;
+      try {
+        await fetch(`${API_BASE}/api/playbooks/${id}`, { method: "DELETE" });
+        loadPlaybooksView();
+      } catch (e) {
+        alert("Ошибка удаления: " + e);
+      }
+    }
+
     function usePlaybook(encodedTemplate) {
       const template = decodeURIComponent(encodedTemplate);
       const input = document.getElementById('user-prompt-input');
@@ -880,6 +969,44 @@
         localStorage.setItem('orchestrator_draft_prompt', template);
       }
       switchTab('new-task');
+    }
+
+    async function runCustomCommandFromUi() {
+      const input = document.getElementById('custom-cmd-input');
+      const cmd = input.value.trim();
+      if (!cmd) {
+        alert("Введите команду.");
+        return;
+      }
+      const btn = document.getElementById('btn-run-custom-cmd');
+      const box = document.getElementById('custom-cmd-result');
+      btn.disabled = true;
+      btn.innerHTML = `<span>⏳</span> Выполняется...`;
+      box.classList.remove('hidden');
+      box.innerHTML = `<span class="text-indigo-400 animate-pulse">Выполнение: ${cmd}...</span>`;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/test/custom`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ command: cmd, workspace_path: appConfig.default_workspace })
+        });
+        const data = await res.json();
+        const isOk = data.ok;
+
+        box.innerHTML = `
+          <div class="flex items-center justify-between pb-2 mb-2 border-b border-gray-800">
+            <span class="font-bold ${isOk ? 'text-emerald-400' : 'text-red-400'}">${isOk ? '✓ УСПЕШНО' : '✕ ОШИБКА (Exit code ' + data.exit_code + ')'}</span>
+            <span class="text-gray-500">${data.command}</span>
+          </div>
+          <pre class="whitespace-pre-wrap text-[11px] text-gray-300 max-h-60 overflow-y-auto">${data.output || 'Команда завершилась без вывода'}</pre>
+        `;
+      } catch (e) {
+        box.innerHTML = `<span class="text-red-400">Ошибка: ${e}</span>`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>▶</span> Выполнить`;
+      }
     }
 
     // --- TESTING & SANDBOX LOGIC ---
