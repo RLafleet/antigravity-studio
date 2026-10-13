@@ -186,4 +186,44 @@ class GeminiClient:
             except Exception as ex:
                 last_error = f"Model {model} connection error: {str(ex)}"
 
+        # Resilient Fallback 1: Local Antigravity CLI (agy.exe)
+        try:
+            agy_bin = r"C:\Users\decoriko\AppData\Local\agy\bin\agy.exe"
+            import os
+            import subprocess
+            if os.path.exists(agy_bin):
+                agy_model = f"gemini-3.8-flash-{level}" if level in ["high", "medium", "low"] else "gemini-3.8-flash-high"
+                full_prompt = prompt
+                if system_instruction:
+                    full_prompt = f"System instructions:\n{system_instruction}\n\nUser request:\n{full_prompt}"
+                if json_output:
+                    full_prompt = f"{full_prompt}\n\nIMPORTANT: Output MUST be strictly valid JSON without markdown fences."
+
+                p = subprocess.run([agy_bin, "--model", agy_model, "-p", full_prompt], capture_output=True, text=True, encoding="utf-8")
+                if p.returncode == 0 and p.stdout.strip():
+                    text = p.stdout.strip()
+                    result = {
+                        "ok": True,
+                        "text": text,
+                        "model_used": agy_model,
+                        "engine": "agy_cli",
+                        "usage": {"totalTokenCount": 0}
+                    }
+                    if json_output:
+                        try:
+                            clean_text = text.strip()
+                            if clean_text.startswith("```json"):
+                                clean_text = clean_text[7:]
+                            if clean_text.startswith("```"):
+                                clean_text = clean_text[3:]
+                            if clean_text.endswith("```"):
+                                clean_text = clean_text[:-3]
+                            result["json"] = json.loads(clean_text.strip())
+                        except Exception as je:
+                            result["json_error"] = str(je)
+                    return result
+        except Exception as cli_err:
+            last_error += f" | CLI fallback error: {str(cli_err)}"
+
         return {"ok": False, "error": last_error}
+
