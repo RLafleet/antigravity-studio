@@ -146,12 +146,22 @@ class WorkerEngine:
         if not os.path.exists(agy_bin):
             agy_bin = "agy"
 
+        model_target = self.model_name
+        if "gemini-3.8-flash" in model_target:
+            th = (self.thinking_level or "high").lower()
+            if th in ["high", "medium", "low"]:
+                model_target = f"gemini-3.8-flash-{th}"
+            else:
+                model_target = "gemini-3.8-flash-high"
+
         cmd = [
             agy_bin,
+            "--model", model_target,
             "-p", prompt,
             "--dangerously-skip-permissions",
             "--add-dir", self.workspace_path
         ]
+
 
         yield WorkerEvent("status", {
             "status": "running",
