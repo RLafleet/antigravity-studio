@@ -272,41 +272,64 @@ class BoardRoom:
         if not history:
             return {"ok": False, "error": f"История диалога с {role} пуста."}
 
-        # Collect dialog transcript
+        # Collect dialog transcript (last key decisions)
         if role == "debate":
             last_debate = history[-1] if history else {}
-            dialog_text = "\n".join([f"{m.get('speaker')}: {m.get('text')}" for m in last_debate.get("messages", [])])
+            msgs = last_debate.get("messages", [])[-4:]
+            dialog_text = "\n".join([f"{m.get('speaker')}: {m.get('text')}" for m in msgs])
         else:
-            dialog_text = "\n".join([f"{m.get('sender')}: {m.get('text')}" for m in history[-10:]])
+            dialog_text = "\n".join([f"{m.get('sender')}: {m.get('text')}" for m in history[-2:]])
 
-        replan_prompt = f"""=== СОВМЕСТНОЕ РЕШЕНИЕ ИТОГОВ ДИАЛОГА ===
-Роль источника: {role}
-История согласованных решений:
+        if len(dialog_text) > 4000:
+            dialog_text = dialog_text[-4000:]
+
+        compact_steps = []
+        for s in plan.get("steps", []):
+            compact_steps.append({
+                "index": s.get("index"),
+                "title": s.get("title"),
+                "objective": s.get("objective"),
+                "target_files": s.get("target_files", []),
+                "status": s.get("status", "pending")
+            })
+
+        replan_prompt = f"""=== СОВМЕСТНОЕ РЕШЕНИЕ ИТОГОВ ДИАЛОГА ({role.upper()}) ===
 {dialog_text}
 
 === ТЕКУЩИЙ ПЛАН НА ДЕНЬ ===
 Цель: {plan.get('goal')}
-Текущий шаг: {plan.get('current_step_index', 0)}
-Всего шагов: {len(plan.get('steps', []))}
 Текущие шаги:
-{json.dumps(plan.get('steps', []), indent=2, ensure_ascii=False)}
+{json.dumps(compact_steps, indent=2, ensure_ascii=False)}
 
 ЗАДАЧА ОРКЕСТРАТОРА:
-Перестрой и обнови список шагов в плане с учетом согласованных в диалоге решений!
-ВАЖНЫЕ ПРАВИЛА:
-1. Шаги со статусом 'completed' НЕ ТРОГАЙ И НЕ УДАЛЯЙ. Сохрани их как есть.
-2. Оставшиеся шаги со статусом 'pending' обнови, замени, удали лишние или добавь новые шаги, удовлетворяющие новому решению.
-3. Верни СТРОГО валидный JSON следующей структуры:
+Перестрой и обнови список шагов в плане с учетом согласованных решений из диалога!
+ПРАВИЛА:
+1. Шаги со статусом 'completed' сохрани без изменений.
+2. Оставшиеся шаги со статусом 'pending' обнови или дополни новыми требованиями (например, добавь хуки монетизации/заморозки в стейт и конфиги).
+3. Верни СТРОГО валидный JSON структуры:
 {{
-  "summary_of_changes_ru": "Краткое описание, что изменилось в плане на русском языке",
-  "steps": [ ...полный обновленный список шагов с сохранением схемы (index, title, title_en, model, thinking_level, objective, target_files, verification_commands, antigravity_prompt, status)... ]
+  "summary_of_changes_ru": "Краткое описание изменений на русском языке",
+  "steps": [
+    {{
+      "index": 1,
+      "title": "Название шага",
+      "title_en": "Step title in English",
+      "model": "gemini-3.8-flash",
+      "thinking_level": "medium",
+      "objective": "Краткая цель",
+      "target_files": ["combo_models.py", "configs/combos.json"],
+      "verification_commands": ["python -c \\"import combo_models\\""],
+      "antigravity_prompt": "Детальный промпт для воркера...",
+      "status": "pending"
+    }}
+  ]
 }}
 """
         resp = await self.client.generate(
             prompt=replan_prompt,
             json_output=True,
             temperature=0.2,
-            thinking_level="high"
+            thinking_level="medium"
         )
 
         if not resp.get("ok") or not resp.get("json"):

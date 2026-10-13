@@ -2463,6 +2463,13 @@
       const roleTitle = role === 'tech_lead' ? 'Техдиром' : (role === 'director' ? 'Директором' : 'Советом директоров (Дебаты)');
       if (!confirm(`Перестроить оставшиеся шаги плана на день с учетом решений, принятых с ${roleTitle}?`)) return;
 
+      const allButtons = document.querySelectorAll(`button[onclick*="applyBoardToPlan('${role}')"]`);
+      allButtons.forEach(b => {
+        b.dataset.origHtml = b.innerHTML;
+        b.innerHTML = `<span>⏳</span> Gemini перепланирует...`;
+        b.disabled = true;
+      });
+
       try {
         const res = await fetch(`${API_BASE}/api/board/apply_to_plan`, {
           method: "POST",
@@ -2476,11 +2483,17 @@
             closeDebateModal();
           }
           switchTab('day-runner');
+          if (typeof fetchDayPlan === 'function') fetchDayPlan();
         } else {
           alert("Ошибка обновления плана: " + (data.error || "Неизвестная ошибка"));
         }
       } catch (e) {
         alert("Ошибка связи: " + e);
+      } finally {
+        allButtons.forEach(b => {
+          if (b.dataset.origHtml) b.innerHTML = b.dataset.origHtml;
+          b.disabled = false;
+        });
       }
     }
 

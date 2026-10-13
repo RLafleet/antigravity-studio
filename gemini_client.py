@@ -183,6 +183,9 @@ class GeminiClient:
                         return result
                     else:
                         last_error = f"Model {model} returned HTTP {resp.status_code}: {resp.text}"
+                        if resp.status_code in [401, 403, 404]:
+                            # REST key unauthorized/denied, break immediately to local agy CLI
+                            break
             except Exception as ex:
                 last_error = f"Model {model} connection error: {str(ex)}"
 
@@ -199,8 +202,12 @@ class GeminiClient:
                 if json_output:
                     full_prompt = f"{full_prompt}\n\nIMPORTANT: Output MUST be strictly valid JSON without any markdown fences, preambles, or explanations."
 
+                # Safety guard against Windows CreateProcess command-line length limits (32k max)
+                if len(full_prompt) > 20000:
+                    full_prompt = full_prompt[:20000]
+
                 cmd = [agy_bin, "--model", agy_model, "--dangerously-skip-permissions", "-p", full_prompt]
-                p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+                p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", stdin=subprocess.DEVNULL)
                 if p.returncode == 0 and p.stdout.strip():
                     text = p.stdout.strip()
                     result = {
