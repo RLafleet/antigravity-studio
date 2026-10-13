@@ -91,9 +91,16 @@
       <button onclick="switchTab('day-runner')" id="tab-btn-day-runner" class="nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-amber-400 hover:text-white hover:bg-gray-800/60 transition">
         <span class="text-base">🐢</span> Задача на день (Slow)
       </button>
+      <button onclick="switchTab('tech-lead')" id="tab-btn-tech-lead" class="nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-cyan-400 hover:text-white hover:bg-gray-800/60 transition">
+        <span class="text-base">🧠</span> Архитектурный совет
+      </button>
+      <button onclick="switchTab('director')" id="tab-btn-director" class="nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-emerald-400 hover:text-white hover:bg-gray-800/60 transition">
+        <span class="text-base">💼</span> Директор (Бизнес)
+      </button>
       <button onclick="switchTab('playbooks')" id="tab-btn-playbooks" class="nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800/60 transition">
         <span class="text-base">📋</span> Шаблоны / Playbooks
       </button>
+
       <button onclick="switchTab('sandbox')" id="tab-btn-sandbox" class="nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800/60 transition">
         <span class="text-base">🧪</span> Песочница & Тесты
       </button>
@@ -507,6 +514,157 @@
           </div>
         </div>
       </section>
+
+      <!-- ================= TAB: TECH LEAD (ARCHITECT) ================= -->
+      <section id="tab-tech-lead" class="tab-pane hidden flex flex-col gap-4 max-w-5xl mx-auto w-full h-[calc(100vh-100px)]">
+        <!-- Header -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-lg shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-xl">🧠</div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-sm font-bold text-white">Архитектурный совет (Техдир)</h3>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-semibold mono">Principal Architect</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">Gemini 3.8 Flash High</span>
+              </div>
+              <p class="text-xs text-gray-400">Бескомпромиссная надежность, критика рисков и прагматичные решения. Не поддакивает.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="applyBoardToPlan('tech_lead')" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-md" title="Перестроить оставшиеся шаги плана на основе диалога">
+              <span>⚡</span> Применить к плану дня
+            </button>
+            <button onclick="openDebateModal('tech_lead')" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-medium text-cyan-300 border border-cyan-500/30 transition flex items-center gap-1.5" title="Запустить автономный спор Техдира и Директора">
+              <span>🤝</span> Дебаты с Директором
+            </button>
+            <button onclick="clearBoardChat('tech_lead')" class="p-1.5 rounded-lg bg-gray-800 hover:bg-red-900/40 text-gray-400 hover:text-red-300 border border-gray-700 transition text-xs" title="Очистить историю">
+              🗑️
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat messages container -->
+        <div id="tech-lead-chat-box" class="flex-1 bg-gray-900 border border-gray-800 rounded-xl p-4 overflow-y-auto space-y-3.5 shadow-inner">
+          <!-- Dynamically populated -->
+        </div>
+
+        <!-- Input bar -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-3 flex items-center gap-2 shadow-lg shrink-0">
+          <input
+            id="tech-lead-input"
+            type="text"
+            placeholder="Спросите Техдира об архитектуре, оспорьте тайминги или предложите изменение в код..."
+            class="flex-1 bg-gray-950 border border-gray-800 focus:border-cyan-500 rounded-lg px-3.5 py-2.5 text-xs text-white placeholder-gray-500 outline-none transition"
+            onkeydown="if(event.key==='Enter') sendBoardMessage('tech_lead')"
+          />
+          <button id="tech-lead-send-btn" onclick="sendBoardMessage('tech_lead')" class="px-4 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white transition flex items-center gap-1.5">
+            <span>Отправить</span> ➔
+          </button>
+        </div>
+      </section>
+
+      <!-- ================= TAB: REVENUE DIRECTOR ================= -->
+      <section id="tab-director" class="tab-pane hidden flex flex-col gap-4 max-w-5xl mx-auto w-full h-[calc(100vh-100px)]">
+        <!-- Header -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-lg shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-xl">💼</div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-sm font-bold text-white">Директор (Бизнес, Монетизация & Stars)</h3>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold mono">Chief Revenue Officer</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">⭐ Telegram Stars</span>
+              </div>
+              <p class="text-xs text-gray-400">Цель: заработать нам денег, поднять LTV и конверсию. Общается с вами как с партнером-инвестором.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="applyBoardToPlan('director')" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-md" title="Перестроить оставшиеся шаги плана под бизнес-требования">
+              <span>⚡</span> Применить к плану дня
+            </button>
+            <button onclick="openDebateModal('director')" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-medium text-emerald-300 border border-emerald-500/30 transition flex items-center gap-1.5" title="Поставить задачу Техдиру на обсуждение">
+              <span>🤝</span> Задача Техдиру (Дебаты)
+            </button>
+            <button onclick="clearBoardChat('director')" class="p-1.5 rounded-lg bg-gray-800 hover:bg-red-900/40 text-gray-400 hover:text-red-300 border border-gray-700 transition text-xs" title="Очистить историю">
+              🗑️
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat messages container -->
+        <div id="director-chat-box" class="flex-1 bg-gray-900 border border-gray-800 rounded-xl p-4 overflow-y-auto space-y-3.5 shadow-inner">
+          <!-- Dynamically populated -->
+        </div>
+
+        <!-- Input bar -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-3 flex items-center gap-2 shadow-lg shrink-0">
+          <input
+            id="director-input"
+            type="text"
+            placeholder="Обсудите монетизацию, стоимость офферов в Stars, виральность или баланс наград с Директором..."
+            class="flex-1 bg-gray-950 border border-gray-800 focus:border-emerald-500 rounded-lg px-3.5 py-2.5 text-xs text-white placeholder-gray-500 outline-none transition"
+            onkeydown="if(event.key==='Enter') sendBoardMessage('director')"
+          />
+          <button id="director-send-btn" onclick="sendBoardMessage('director')" class="px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition flex items-center gap-1.5">
+            <span>Отправить</span> ➔
+          </button>
+        </div>
+      </section>
+
+      <!-- ================= MODAL: AI-to-AI DEBATES ================= -->
+      <div id="modal-ai-debate" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+          <!-- Modal Header -->
+          <div class="p-4 border-b border-gray-800 bg-gray-950 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <span class="text-xl">🤖</span>
+              <div>
+                <h3 class="text-sm font-bold text-white">Живые дебаты ИИ: Директор ↔ Техдир</h3>
+                <p class="text-[11px] text-gray-400">Автономное согласование компромисса между прибылью и надежностью</p>
+              </div>
+            </div>
+            <button onclick="closeDebateModal()" class="text-gray-400 hover:text-white text-lg p-1">✕</button>
+          </div>
+
+          <!-- Debate Controls -->
+          <div class="p-3 bg-gray-900/60 border-b border-gray-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex-1 min-w-[240px]">
+              <input id="debate-topic-input" type="text" placeholder="Тема дебатов (например: Внедрение платного спасения комбо за 29 Stars)" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-1.5 text-white placeholder-gray-500 text-xs outline-none" />
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-gray-400 text-[11px]">Раунды:</label>
+              <select id="debate-rounds-select" class="bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-white text-xs">
+                <option value="2">2 раунда</option>
+                <option value="3" selected>3 раунда</option>
+                <option value="4">4 раунда</option>
+              </select>
+              <button id="btn-start-debate" onclick="startAiDebate()" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition flex items-center gap-1">
+                <span>▶️</span> Начать
+              </button>
+              <button id="btn-stop-debate" onclick="stopAiDebate()" class="hidden px-3 py-1.5 rounded-lg bg-red-600/30 hover:bg-red-600/50 text-red-300 border border-red-500/30 font-medium transition flex items-center gap-1">
+                <span>⏹</span> Прервать
+              </button>
+            </div>
+          </div>
+
+          <!-- Live Debate Transcript -->
+          <div id="debate-messages-box" class="flex-1 p-4 overflow-y-auto space-y-3 bg-[#080d1a] min-h-[300px]">
+            <div class="text-center text-gray-500 text-xs italic py-8">Задайте тему и нажмите «Начать», чтобы запустить автономный спор двух нейросетей.</div>
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="p-3 bg-gray-950 border-t border-gray-800 flex items-center justify-between">
+            <span id="debate-status-text" class="text-xs text-gray-400">Ожидание запуска</span>
+            <div class="flex items-center gap-2">
+              <button onclick="applyBoardToPlan('debate')" id="btn-apply-debate-plan" class="hidden px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-md">
+                <span>⚡</span> Применить консенсус к плану дня
+              </button>
+              <button onclick="closeDebateModal()" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-300">Закрыть</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
 
       <!-- ================= TAB: PLAYBOOKS ================= -->
       <section id="tab-playbooks" class="tab-pane hidden flex flex-col gap-5 max-w-4xl mx-auto w-full">
@@ -1022,6 +1180,8 @@
       if (tabId === 'git') loadGitView();
       if (tabId === 'day-runner') fetchDayPlan();
       if (tabId === 'monitor') checkWorkerStatus();
+      if (tabId === 'tech-lead') loadBoardHistory('tech_lead');
+      if (tabId === 'director') loadBoardHistory('director');
     }
 
     async function checkWorkerStatus() {
@@ -2087,6 +2247,396 @@
       } catch (e) {
         alert("Ошибка сброса: " + e);
       }
+    }
+
+    // ================= BOARD ROOM & AI LEADERSHIP LOGIC =================
+    let activeDebateEventSource = null;
+
+    function formatBoardText(text) {
+      if (!text) return '';
+      let escaped = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      
+      escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>');
+      escaped = escaped.replace(/`([^`]+)`/g, '<code class="bg-gray-800 text-indigo-300 px-1 py-0.5 rounded text-[11px] font-mono">$1</code>');
+      escaped = escaped.replace(/\n/g, '<br/>');
+      return escaped;
+    }
+
+    function insertBoardSuggestion(role, text) {
+      const input = document.getElementById(role === 'tech_lead' ? 'tech-lead-input' : 'director-input');
+      if (input) {
+        input.value = text;
+        input.focus();
+      }
+    }
+
+    async function loadBoardHistory(role) {
+      const boxId = role === 'tech_lead' ? 'tech-lead-chat-box' : 'director-chat-box';
+      const container = document.getElementById(boxId);
+      if (!container) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/board/history?role=${role}`);
+        const data = await res.json();
+        const history = (data && data.history) || [];
+
+        container.innerHTML = "";
+
+        if (history.length === 0) {
+          if (role === 'tech_lead') {
+            container.innerHTML = `
+              <div class="bg-cyan-950/20 border border-cyan-500/30 rounded-xl p-4 text-xs text-gray-300 shadow">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-lg">🧠</span>
+                  <span class="font-bold text-white text-sm">Главный Архитектор (Техдир) готов к диалогу</span>
+                </div>
+                <p class="leading-relaxed text-gray-300">
+                  Я не поддакиваю и не строю воздушных замков. Моя цель — надежность архитектуры, стабильный FPS, чистый код и отсутствие костылей.
+                  Задавайте вопросы по архитектуре, спорьте со мной или предлагайте фичи — я разберу их техническую суть.
+                </p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <span class="text-[11px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg cursor-pointer hover:bg-cyan-500/20 transition" onclick="insertBoardSuggestion('tech_lead', 'Оцени архитектурные риски добавления платного спасения комбо за 29 Stars')">💡 Архитектурные риски Stars</span>
+                  <span class="text-[11px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg cursor-pointer hover:bg-cyan-500/20 transition" onclick="insertBoardSuggestion('tech_lead', 'Как защитить начисление комбо и очков от читерства на клиенте?')">💡 Защита от накрутки очков</span>
+                  <span class="text-[11px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg cursor-pointer hover:bg-cyan-500/20 transition" onclick="insertBoardSuggestion('tech_lead', 'Предложи минималистичный рефакторинг для ускорения рендеринга')">💡 Минималистичный рефакторинг</span>
+                </div>
+              </div>
+            `;
+          } else {
+            container.innerHTML = `
+              <div class="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-4 text-xs text-gray-300 shadow">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-lg">💼</span>
+                  <span class="font-bold text-white text-sm">Коммерческий Директор на связи</span>
+                </div>
+                <p class="leading-relaxed text-gray-300">
+                  Приветствую, партнер! Моя задача — выручка, удержание и конверсия в Telegram Stars. Ты инвестор и фаундер, поэтому говорим на равных, без воды и опираясь на цифры и психологию игроков.
+                </p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <span class="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg cursor-pointer hover:bg-emerald-500/20 transition" onclick="insertBoardSuggestion('director', 'Какие офферы в Stars добавят максимум прибыли без раздражения игроков?')">⭐ Топовые офферы Stars</span>
+                  <span class="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg cursor-pointer hover:bg-emerald-500/20 transition" onclick="insertBoardSuggestion('director', 'Как поднять удержание (Retention) на 1-й и 7-й день?')">📈 Удержание игроков</span>
+                  <span class="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg cursor-pointer hover:bg-emerald-500/20 transition" onclick="insertBoardSuggestion('director', 'Сформулируй задачу для Техдира на разработку спасения комбо')">🎯 Задача для Техдира</span>
+                </div>
+              </div>
+            `;
+          }
+          return;
+        }
+
+        history.forEach(msg => {
+          renderBoardMessageBubble(container, msg, role);
+        });
+
+        container.scrollTop = container.scrollHeight;
+      } catch (e) {
+        console.error("loadBoardHistory error:", e);
+      }
+    }
+
+    function renderBoardMessageBubble(container, msg, currentRole) {
+      const isUser = msg.sender === 'Пользователь' || msg.sender === 'Инвестор';
+      const bubble = document.createElement('div');
+      bubble.className = isUser ? "flex justify-end" : "flex justify-start";
+
+      if (isUser) {
+        bubble.innerHTML = `
+          <div class="max-w-[80%] bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-3.5 text-xs text-gray-100 shadow-md">
+            <div class="flex items-center justify-between gap-3 mb-1 text-[10px] text-indigo-300">
+              <span class="font-semibold">Вы (Инвестор / Партнер)</span>
+              <span class="font-mono text-gray-400">${msg.time || ''}</span>
+            </div>
+            <div class="leading-relaxed whitespace-pre-wrap">${formatBoardText(msg.text)}</div>
+          </div>
+        `;
+      } else {
+        const isTechLead = currentRole === 'tech_lead' || msg.sender === 'Техдир';
+        const accentColor = isTechLead ? 'cyan' : 'emerald';
+        const icon = isTechLead ? '🧠' : '💼';
+        const roleTitle = isTechLead ? 'Главный Архитектор (Техдир)' : 'Коммерческий Директор';
+        const badge = isTechLead ? 'Principal Tech Lead' : '⭐ Telegram Stars & Revenue';
+
+        bubble.innerHTML = `
+          <div class="max-w-[85%] bg-gray-950/80 border border-${accentColor}-500/30 rounded-2xl p-4 text-xs text-gray-200 shadow-lg">
+            <div class="flex items-center justify-between gap-3 mb-2 pb-1.5 border-b border-gray-800">
+              <div class="flex items-center gap-2">
+                <span class="text-base">${icon}</span>
+                <span class="font-bold text-white text-xs">${roleTitle}</span>
+                <span class="text-[9px] px-1.5 py-0.5 rounded bg-${accentColor}-500/10 text-${accentColor}-300 border border-${accentColor}-500/20 font-mono">${badge}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] text-purple-300 font-mono">${msg.model || 'gemini-3.8-flash-high'}</span>
+                <span class="text-[10px] font-mono text-gray-400">${msg.time || ''}</span>
+              </div>
+            </div>
+            <div class="leading-relaxed text-gray-300 text-xs">${formatBoardText(msg.text)}</div>
+          </div>
+        `;
+      }
+      container.appendChild(bubble);
+    }
+
+    async function sendBoardMessage(role) {
+      const input = document.getElementById(role === 'tech_lead' ? 'tech-lead-input' : 'director-input');
+      const btn = document.getElementById(role === 'tech_lead' ? 'tech-lead-send-btn' : 'director-send-btn');
+      const container = document.getElementById(role === 'tech_lead' ? 'tech-lead-chat-box' : 'director-chat-box');
+
+      const text = input.value.trim();
+      if (!text) return;
+
+      input.value = "";
+      input.disabled = true;
+      btn.disabled = true;
+
+      // Render user message immediately
+      const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      renderBoardMessageBubble(container, { sender: 'Пользователь', text, time: nowStr }, role);
+
+      // Render loading placeholder
+      const loadingBubble = document.createElement('div');
+      loadingBubble.id = 'board-loading-placeholder';
+      loadingBubble.className = "flex justify-start";
+      const isTechLead = role === 'tech_lead';
+      loadingBubble.innerHTML = `
+        <div class="bg-gray-950/80 border border-gray-800 rounded-2xl p-3.5 text-xs text-gray-400 flex items-center gap-3 animate-pulse">
+          <span class="text-base">${isTechLead ? '🧠' : '💼'}</span>
+          <span>${isTechLead ? 'Техдир анализирует архитектурные риски и ограничения...' : 'Директор рассчитывает юнит-экономику и влияние на конверсию...'}</span>
+        </div>
+      `;
+      container.appendChild(loadingBubble);
+      container.scrollTop = container.scrollHeight;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/board/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role, message: text })
+        });
+        const data = await res.json();
+
+        const placeholder = document.getElementById('board-loading-placeholder');
+        if (placeholder) placeholder.remove();
+
+        if (data.ok) {
+          renderBoardMessageBubble(container, {
+            sender: isTechLead ? 'Техдир' : 'Директор',
+            text: data.reply,
+            time: nowStr,
+            model: data.model_used
+          }, role);
+        } else {
+          const errDiv = document.createElement('div');
+          errDiv.className = "p-3 rounded-lg bg-red-950/30 border border-red-500/30 text-xs text-red-300";
+          errDiv.textContent = "Ошибка ответа: " + (data.error || "Неизвестная ошибка");
+          container.appendChild(errDiv);
+        }
+      } catch (e) {
+        const placeholder = document.getElementById('board-loading-placeholder');
+        if (placeholder) placeholder.remove();
+        alert("Ошибка отправки: " + e);
+      } finally {
+        input.disabled = false;
+        btn.disabled = false;
+        input.focus();
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+
+    async function clearBoardChat(role) {
+      const roleName = role === 'tech_lead' ? 'Техдиром' : 'Директором';
+      if (!confirm(`Очистить историю диалога с ${roleName}?`)) return;
+
+      try {
+        await fetch(`${API_BASE}/api/board/clear`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role })
+        });
+        loadBoardHistory(role);
+      } catch (e) {
+        alert("Ошибка очистки истории: " + e);
+      }
+    }
+
+    async function applyBoardToPlan(role) {
+      const roleTitle = role === 'tech_lead' ? 'Техдиром' : (role === 'director' ? 'Директором' : 'Советом директоров (Дебаты)');
+      if (!confirm(`Перестроить оставшиеся шаги плана на день с учетом решений, принятых с ${roleTitle}?`)) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/board/apply_to_plan`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          alert(`⚡ План на день успешно обновлен!\n\n${data.summary_of_changes_ru}\n\nВсего шагов в плане: ${data.total_steps}`);
+          if (role === 'debate') {
+            closeDebateModal();
+          }
+          switchTab('day-runner');
+        } else {
+          alert("Ошибка обновления плана: " + (data.error || "Неизвестная ошибка"));
+        }
+      } catch (e) {
+        alert("Ошибка связи: " + e);
+      }
+    }
+
+    // --- AI DEBATES MODAL LOGIC ---
+    function openDebateModal(originRole) {
+      const modal = document.getElementById('modal-ai-debate');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+
+      const topicInput = document.getElementById('debate-topic-input');
+      if (topicInput && !topicInput.value.trim()) {
+        topicInput.value = "Внедрение платного спасения комбо за 29 Stars с серверной валидацией";
+      }
+    }
+
+    function closeDebateModal() {
+      const modal = document.getElementById('modal-ai-debate');
+      if (modal) modal.classList.add('hidden');
+      stopAiDebate();
+    }
+
+    function startAiDebate() {
+      const topicInput = document.getElementById('debate-topic-input');
+      const roundsSelect = document.getElementById('debate-rounds-select');
+      const topic = topicInput ? topicInput.value.trim() : "";
+      const maxRounds = roundsSelect ? parseInt(roundsSelect.value) || 3 : 3;
+
+      if (!topic) {
+        alert("Укажите тему дебатов для ИИ.");
+        return;
+      }
+
+      const box = document.getElementById('debate-messages-box');
+      box.innerHTML = "";
+
+      const startBtn = document.getElementById('btn-start-debate');
+      const stopBtn = document.getElementById('btn-stop-debate');
+      const applyBtn = document.getElementById('btn-apply-debate-plan');
+      const statusText = document.getElementById('debate-status-text');
+
+      if (startBtn) startBtn.classList.add('hidden');
+      if (stopBtn) stopBtn.classList.remove('hidden');
+      if (applyBtn) applyBtn.classList.add('hidden');
+      if (statusText) statusText.innerHTML = `<span class="text-emerald-400 font-semibold animate-pulse">🔴 Прямой эфир дебатов...</span>`;
+
+      // Connect to SSE stream
+      const streamUrl = `${API_BASE}/api/board/debate/stream?topic=${encodeURIComponent(topic)}&max_rounds=${maxRounds}`;
+      activeDebateEventSource = new EventSource(streamUrl);
+
+      activeDebateEventSource.onmessage = (e) => {
+        try {
+          const event = JSON.parse(e.data);
+          handleDebateStreamEvent(event);
+        } catch (err) {
+          console.error("SSE parse error:", err);
+        }
+      };
+
+      activeDebateEventSource.onerror = (err) => {
+        console.warn("SSE connection closed or ended:", err);
+        stopAiDebate(false);
+      };
+    }
+
+    function handleDebateStreamEvent(event) {
+      const box = document.getElementById('debate-messages-box');
+      const applyBtn = document.getElementById('btn-apply-debate-plan');
+      const statusText = document.getElementById('debate-status-text');
+
+      // Remove temporary thinking indicator if exists
+      const thinkingEl = document.getElementById('debate-thinking-indicator');
+      if (thinkingEl && event.type !== 'thinking') {
+        thinkingEl.remove();
+      }
+
+      if (event.type === 'start') {
+        box.innerHTML += `
+          <div class="text-center my-2">
+            <span class="text-[11px] px-3 py-1 rounded-full bg-indigo-900/30 text-indigo-300 border border-indigo-500/30 font-medium">
+              ${event.message}
+            </span>
+          </div>
+        `;
+      } else if (event.type === 'thinking') {
+        if (!thinkingEl) {
+          const tDiv = document.createElement('div');
+          tDiv.id = 'debate-thinking-indicator';
+          tDiv.className = "flex items-center gap-2 p-2.5 rounded-lg bg-gray-900/60 border border-gray-800 text-xs text-gray-400 animate-pulse";
+          tDiv.innerHTML = `<span>⏳</span><span>${event.message}</span>`;
+          box.appendChild(tDiv);
+        } else {
+          thinkingEl.innerHTML = `<span>⏳</span><span>${event.message}</span>`;
+        }
+      } else if (event.type === 'message') {
+        const isDirector = event.role === 'director';
+        const cardCol = isDirector ? 'emerald' : 'cyan';
+        const icon = isDirector ? '💼' : '🧠';
+        const roleTitle = isDirector ? 'Директор (Бизнес & Выручка)' : 'Техдир (Главный Архитектор)';
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `p-3.5 rounded-xl border border-${cardCol}-500/30 bg-gray-950/70 shadow flex flex-col gap-1.5`;
+        msgDiv.innerHTML = `
+          <div class="flex items-center justify-between text-xs pb-1 border-b border-gray-800">
+            <div class="flex items-center gap-2">
+              <span>${icon}</span>
+              <span class="font-bold text-${cardCol}-300">${roleTitle}</span>
+              <span class="text-[10px] px-1.5 py-0.2 rounded bg-gray-900 text-gray-400 font-mono">Раунд ${event.round}</span>
+            </div>
+            <span class="text-[10px] text-gray-500 font-mono">${event.time}</span>
+          </div>
+          <div class="text-xs text-gray-300 leading-relaxed">${formatBoardText(event.text)}</div>
+        `;
+        box.appendChild(msgDiv);
+      } else if (event.type === 'consensus') {
+        const consensusDiv = document.createElement('div');
+        consensusDiv.className = "p-4 rounded-xl border-2 border-amber-500/60 bg-amber-950/20 shadow-xl flex flex-col gap-2 my-2";
+        consensusDiv.innerHTML = `
+          <div class="flex items-center gap-2 text-amber-300 font-bold text-sm">
+            <span>🤝</span>
+            <span>ДОСТИГНУТ СОВМЕСТНЫЙ КОНСЕНСУС:</span>
+          </div>
+          <p class="text-xs text-amber-100 font-medium leading-relaxed">${formatBoardText(event.consensus)}</p>
+        `;
+        box.appendChild(consensusDiv);
+        if (applyBtn) applyBtn.classList.remove('hidden');
+      } else if (event.type === 'end') {
+        if (statusText) statusText.textContent = `Дебаты завершены (${event.rounds_completed || 1} раундов)`;
+        stopAiDebate(false);
+      }
+
+      box.scrollTop = box.scrollHeight;
+    }
+
+    async function stopAiDebate(notifyServer = true) {
+      if (activeDebateEventSource) {
+        activeDebateEventSource.close();
+        activeDebateEventSource = null;
+      }
+      if (notifyServer) {
+        try {
+          await fetch(`${API_BASE}/api/board/stop_debate`, { method: "POST" });
+        } catch (e) {}
+      }
+
+      const startBtn = document.getElementById('btn-start-debate');
+      const stopBtn = document.getElementById('btn-stop-debate');
+      const statusText = document.getElementById('debate-status-text');
+
+      if (startBtn) startBtn.classList.remove('hidden');
+      if (stopBtn) stopBtn.classList.add('hidden');
+      if (statusText && !statusText.textContent.includes('завершены')) {
+        statusText.textContent = "Дебаты остановлены";
+      }
+
+      const thinkingEl = document.getElementById('debate-thinking-indicator');
+      if (thinkingEl) thinkingEl.remove();
     }
 
     // Startup

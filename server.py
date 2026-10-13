@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -29,6 +30,7 @@ from test_engine import (
 )
 from git_manager import get_git_status, git_commit_and_push
 from day_orchestrator import DayOrchestrator
+from board_room import BoardRoom, load_chat_history, save_chat_history
 
 app = FastAPI(title="Antigravity Studio API", version="2.0.0")
 
@@ -41,6 +43,8 @@ app.add_middleware(
 )
 
 active_worker: Optional[WorkerEngine] = None
+board_room = BoardRoom()
+
 
 
 active_day_orchestrator: Optional[DayOrchestrator] = None
@@ -104,6 +108,21 @@ class PlaybookModel(BaseModel):
     category: str
     description: str
     template: str
+
+
+class BoardChatRequest(BaseModel):
+    role: str  # "tech_lead" or "director"
+    message: str
+
+
+class BoardDebateRequest(BaseModel):
+    topic: str
+    max_rounds: int = 3
+
+
+class BoardApplyRequest(BaseModel):
+    role: str  # "tech_lead", "director", or "debate"
+
 
 
 # --- Endpoints ---
@@ -354,7 +373,60 @@ async def clear_day_plan_api():
     return {"ok": True, "message": "План на день очищен"}
 
 
+# --- Board Room Endpoints ---
+
+@app.get("/api/board/history")
+async def get_board_history(role: str = "tech_lead"):
+    """Returns chat history for tech_lead, director, or debate."""
+    return {"ok": True, "role": role, "history": load_chat_history(role)}
+
+
+@app.post("/api/board/chat")
+async def board_chat(req: BoardChatRequest):
+    """Sends user message to Tech Lead or Revenue Director."""
+    return await board_room.talk_to_role(req.role, req.message)
+
+
+@app.post("/api/board/debate")
+async def board_debate(req: BoardDebateRequest):
+    """Runs autonomous AI-to-AI debate between Director and Tech Lead."""
+    results = []
+    async for event in board_room.run_ai_debate(req.topic, req.max_rounds):
+        results.append(event)
+    return {"ok": True, "events": results}
+
+
+@app.get("/api/board/debate/stream")
+async def board_debate_stream(topic: str, max_rounds: int = 3):
+    """Streams live AI-to-AI debate events via Server-Sent Events (SSE)."""
+    async def event_generator():
+        async for event in board_room.run_ai_debate(topic, max_rounds):
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/api/board/stop_debate")
+async def stop_board_debate():
+    """Interrupts active AI debate."""
+    board_room.stop_debate()
+    return {"ok": True, "message": "Дебаты прерваны"}
+
+
+@app.post("/api/board/apply_to_plan")
+async def apply_board_to_plan(req: BoardApplyRequest):
+    """Applies dialog consensus and adjustments directly to day_plan.json."""
+    return await board_room.apply_dialog_to_plan(req.role)
+
+
+@app.post("/api/board/clear")
+async def clear_board_history(req: BoardApplyRequest):
+    """Clears history for specified role."""
+    save_chat_history(req.role, [])
+    return {"ok": True, "message": f"История диалога ({req.role}) очищена"}
+
+
 # --- Git Endpoints ---
+
 
 @app.post("/api/git/status")
 async def git_status(req: ScanRequest):
