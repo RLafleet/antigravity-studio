@@ -179,19 +179,50 @@ class WorkerEngine:
                 stderr=asyncio.subprocess.PIPE
             )
 
+            event_queue: asyncio.Queue = asyncio.Queue()
+
+            async def stream_reader(stream, is_err=False):
+                try:
+                    while True:
+                        line = await stream.readline()
+                        if not line:
+                            break
+                        text = line.decode("utf-8", errors="replace").rstrip()
+                        if not text:
+                            continue
+                        if is_err:
+                            if "jetski: no output" in text:
+                                continue
+                            await event_queue.put(WorkerEvent("log", {"text": f"[err] {text}"}).to_dict())
+                        else:
+                            if text.startswith("[Thinking]") or "thought" in text.lower()[:15]:
+                                await event_queue.put(WorkerEvent("thought", {"thought": text}).to_dict())
+                            elif any(w in text.lower() for w in ["tool:", "executing", "running", "git", "file", "edit"]):
+                                await event_queue.put(WorkerEvent("tool", {"tool": text}).to_dict())
+                            else:
+                                await event_queue.put(WorkerEvent("log", {"text": text}).to_dict())
+                except Exception:
+                    pass
+
+            stdout_task = asyncio.create_task(stream_reader(self._current_process.stdout, False))
+            stderr_task = asyncio.create_task(stream_reader(self._current_process.stderr, True))
+
             brain_dir = Path.home() / ".gemini" / "antigravity-cli" / "brain"
             lines_read = 0
             log_file: Optional[Path] = None
-            finished_seen = False
 
-            while self.is_running and self._current_process.returncode is None:
+            while self.is_running:
+                while not event_queue.empty():
+                    yield event_queue.get_nowait()
+
+                # Also poll brain_dir transcripts if available
                 if not log_file or not log_file.exists():
                     if brain_dir.exists():
                         dirs = sorted(brain_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
                         if dirs:
-                            candidate = dirs[0] / ".system_generated" / "logs" / "transcript.jsonl"
-                            if candidate.exists():
-                                log_file = candidate
+                            cand = dirs[0] / ".system_generated" / "logs" / "transcript.jsonl"
+                            if cand.exists():
+                                log_file = cand
 
                 if log_file and log_file.exists():
                     try:
@@ -209,52 +240,24 @@ class WorkerEngine:
                                                 yield WorkerEvent("tool", {
                                                     "tool": f"Tool: {tc.get('name')}({tc.get('args', {})})"
                                                 }).to_dict()
-                                        if obj.get("type") == "PLANNER_RESPONSE" and obj.get("content"):
-                                            yield WorkerEvent("token", {"token": obj.get("content")}).to_dict()
-                                            finished_seen = True
                                     except Exception:
                                         pass
                     except Exception:
                         pass
 
-                if finished_seen:
-                    await asyncio.sleep(1.5)
+                if self._current_process.returncode is not None:
                     break
 
                 try:
-                    await asyncio.wait_for(asyncio.shield(self._current_process.wait()), timeout=0.8)
+                    await asyncio.wait_for(asyncio.shield(self._current_process.wait()), timeout=0.3)
                 except asyncio.TimeoutError:
                     pass
 
-            if self._current_process.returncode is None:
-                try:
-                    self._current_process.terminate()
-                except Exception:
-                    pass
+            await stdout_task
+            await stderr_task
+            while not event_queue.empty():
+                yield event_queue.get_nowait()
 
-            # Final check of lines
-            if log_file and log_file.exists():
-                try:
-                    with open(log_file, "r", encoding="utf-8") as f:
-                        all_lines = f.readlines()
-                        if len(all_lines) > lines_read:
-                            for line in all_lines[lines_read:]:
-                                lines_read += 1
-                                try:
-                                    obj = json.loads(line)
-                                    if obj.get("thinking"):
-                                        yield WorkerEvent("thought", {"thought": obj.get("thinking")}).to_dict()
-                                    if obj.get("tool_calls"):
-                                        for tc in obj.get("tool_calls", []):
-                                            yield WorkerEvent("tool", {
-                                                "tool": f"Tool: {tc.get('name')}({tc.get('args', {})})"
-                                            }).to_dict()
-                                    if obj.get("type") == "PLANNER_RESPONSE" and obj.get("content"):
-                                        yield WorkerEvent("token", {"token": obj.get("content")}).to_dict()
-                                except Exception:
-                                    pass
-                except Exception:
-                    pass
 
         except Exception as e:
             yield WorkerEvent("error", {

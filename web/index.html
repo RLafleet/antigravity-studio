@@ -300,22 +300,27 @@
         <!-- Status Header Bar -->
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center justify-between shadow-lg">
           <div class="flex items-center gap-3">
-            <div id="worker-status-spinner" class="w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div>
+            <div id="worker-status-idle-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"></div>
+            <div id="worker-status-spinner" class="hidden w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div>
             <div>
               <div class="flex items-center gap-2">
-                <span id="worker-status-title" class="text-sm font-bold text-white">Выполнение задания</span>
-                <span id="worker-model-badge" class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 mono font-semibold">Gemini 3.8 Flash</span>
-                <span id="worker-thinking-badge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mono">HIGH</span>
+                <span id="worker-status-title" class="text-sm font-bold text-white">Агент свободен</span>
+                <span id="worker-model-badge" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 mono font-semibold">Gemini 3.8 Flash</span>
+                <span id="worker-thinking-badge" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mono">HIGH</span>
               </div>
-              <p id="worker-status-sub" class="text-xs text-gray-400">Ожидание событий...</p>
+              <p id="worker-status-sub" class="text-xs text-gray-400">В ожидании задач. Запустите задачу из вкладки «Новая задача» или «Задача на день»</p>
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button onclick="stopExecution()" class="px-3 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/30 text-xs font-medium transition">
+            <button id="worker-new-task-btn" onclick="switchTab('new-task')" class="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 text-xs font-medium transition flex items-center gap-1.5">
+              🚀 Создать задачу
+            </button>
+            <button id="worker-stop-btn" onclick="stopExecution()" class="hidden px-3 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/30 text-xs font-medium transition">
               ⏹ Остановить
             </button>
           </div>
         </div>
+
 
         <!-- Split Terminal / Thought Stream -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-[420px]">
@@ -842,7 +847,17 @@
           localStorage.setItem('orchestrator_draft_prompt', promptEl.value);
         });
       }
+
+      // Initial status check and periodic polling for live monitoring
+      checkWorkerStatus();
+      setInterval(() => {
+        const monPane = document.getElementById('tab-monitor');
+        if (monPane && !monPane.classList.contains('hidden')) {
+          checkWorkerStatus();
+        }
+      }, 3000);
     }
+
 
     async function loadConfig() {
       try {
@@ -1006,7 +1021,63 @@
       if (tabId === 'playbooks') loadPlaybooksView();
       if (tabId === 'git') loadGitView();
       if (tabId === 'day-runner') fetchDayPlan();
+      if (tabId === 'monitor') checkWorkerStatus();
     }
+
+    async function checkWorkerStatus() {
+      try {
+        const res = await fetch(`${API_BASE}/api/worker/status`);
+        const status = await res.json();
+        const spinner = document.getElementById('worker-status-spinner');
+        const idleDot = document.getElementById('worker-status-idle-dot');
+        const title = document.getElementById('worker-status-title');
+        const sub = document.getElementById('worker-status-sub');
+        const modelBadge = document.getElementById('worker-model-badge');
+        const thinkBadge = document.getElementById('worker-thinking-badge');
+        const stopBtn = document.getElementById('worker-stop-btn');
+        const newBtn = document.getElementById('worker-new-task-btn');
+        const monitorBadge = document.getElementById('monitor-badge');
+
+        if (status.is_running) {
+          if (spinner) spinner.classList.remove('hidden');
+          if (idleDot) idleDot.classList.add('hidden');
+          if (stopBtn) stopBtn.classList.remove('hidden');
+          if (newBtn) newBtn.classList.add('hidden');
+          if (monitorBadge) monitorBadge.classList.remove('hidden');
+
+          if (title) title.textContent = status.task_title || "Выполнение задания";
+          if (sub) {
+            if (status.mode === 'day_pipeline') {
+              sub.textContent = `Конвейер на день: Шаг ${(status.step_index || 0) + 1}/${status.total_steps || 1} (Slow & Steady)`;
+            } else {
+              sub.textContent = "Агент выполняет задачу...";
+            }
+          }
+          if (modelBadge) {
+            modelBadge.classList.remove('hidden');
+            modelBadge.textContent = status.model;
+          }
+          if (thinkBadge) {
+            thinkBadge.classList.remove('hidden');
+            thinkBadge.textContent = (status.thinking || 'HIGH').toUpperCase();
+          }
+        } else if (!ws || ws.readyState !== WebSocket.OPEN) {
+          if (spinner) spinner.classList.add('hidden');
+          if (idleDot) idleDot.classList.remove('hidden');
+          if (stopBtn) stopBtn.classList.add('hidden');
+          if (newBtn) newBtn.classList.remove('hidden');
+          if (monitorBadge) monitorBadge.classList.add('hidden');
+
+          if (title) title.textContent = "Агент свободен";
+          if (sub) sub.textContent = "В ожидании задач. Запустите задачу из вкладки «Новая задача» или «Задача на день»";
+          if (modelBadge) modelBadge.classList.add('hidden');
+          if (thinkBadge) thinkBadge.classList.add('hidden');
+        }
+      } catch (e) {
+        console.error("Worker status check error:", e);
+      }
+    }
+
 
     // --- PLAYBOOKS LOGIC ---
     async function loadPlaybooksView() {
@@ -1441,6 +1512,17 @@
       toolCount = 0;
       document.getElementById('tool-count-badge').textContent = `0 действий`;
 
+      const spinner = document.getElementById('worker-status-spinner');
+      const idleDot = document.getElementById('worker-status-idle-dot');
+      const stopBtn = document.getElementById('worker-stop-btn');
+      const newBtn = document.getElementById('worker-new-task-btn');
+      if (spinner) spinner.classList.remove('hidden');
+      if (idleDot) idleDot.classList.add('hidden');
+      if (stopBtn) stopBtn.classList.remove('hidden');
+      if (newBtn) newBtn.classList.add('hidden');
+      document.getElementById('worker-model-badge').classList.remove('hidden');
+      document.getElementById('worker-thinking-badge').classList.remove('hidden');
+
       const selectedModel = document.getElementById('task-model-select').value;
       const modelObj = availableModels.find(m => m.id === selectedModel) || { name: selectedModel };
 
@@ -1472,9 +1554,10 @@
 
       ws.onclose = () => {
         document.getElementById('monitor-badge').classList.add('hidden');
-        document.getElementById('worker-status-spinner').classList.add('hidden');
+        setTimeout(checkWorkerStatus, 500);
       };
     }
+
 
     function handleWorkerEvent(msg) {
       const type = msg.event;

@@ -427,11 +427,63 @@ async def delete_history_item(task_id: str):
 
 @app.post("/api/stop")
 async def stop_execution():
-    global active_worker
-    if active_worker:
+    global active_worker, active_day_orchestrator
+    stopped = False
+    if active_worker and active_worker.is_running:
         active_worker.stop()
+        stopped = True
+    if active_day_orchestrator and active_day_orchestrator.is_running:
+        active_day_orchestrator.pause()
+        stopped = True
+    if stopped:
         return {"ok": True, "message": "Остановка задачи запрошена"}
     return {"ok": False, "message": "Нет активных задач"}
+
+
+@app.get("/api/worker/status")
+async def get_worker_status():
+    global active_worker, active_day_orchestrator, active_day_task
+    cfg = load_config()
+    day_running = bool(active_day_task and not active_day_task.done() and active_day_orchestrator and active_day_orchestrator.is_running)
+    single_running = bool(active_worker and active_worker.is_running)
+
+    plan_data = load_day_plan() if day_running else None
+    current_step = None
+    if plan_data and "steps" in plan_data:
+        idx = plan_data.get("current_step_index", 0)
+        if idx < len(plan_data["steps"]):
+            current_step = plan_data["steps"][idx]
+
+    is_running = single_running or day_running
+    mode = "day_pipeline" if day_running else ("single_task" if single_running else "idle")
+    
+    task_title = None
+    if day_running:
+        task_title = (current_step.get("title") if current_step else plan_data.get("goal"))
+    elif single_running:
+        task_title = "Выполнение задания"
+
+    model = "gemini-3.8-flash"
+    thinking = "high"
+    if day_running and current_step:
+        model = current_step.get("model", "gemini-3.8-flash")
+        thinking = current_step.get("thinking_level", "high")
+    elif single_running and active_worker:
+        model = active_worker.model_name
+        thinking = active_worker.thinking_level
+
+    return {
+        "ok": True,
+        "is_running": is_running,
+        "mode": mode,
+        "task_title": task_title,
+        "model": model,
+        "thinking": thinking,
+        "step_index": plan_data.get("current_step_index") if plan_data else None,
+        "total_steps": plan_data.get("total_steps") if plan_data else None,
+        "workspace_path": cfg.get("default_workspace", "")
+    }
+
 
 
 @app.websocket("/ws/execute")

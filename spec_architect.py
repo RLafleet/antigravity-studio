@@ -184,38 +184,37 @@ async def _architect_via_agy(input_payload: str, model_name: str = "gemini-3.8-f
     """Fallback generator using Antigravity CLI."""
     import asyncio
     agy_bin = r"C:\Users\decoriko\AppData\Local\agy\bin\agy.exe"
-    prompt = f"{TECH_LEAD_SYSTEM_PROMPT}\n\nStrictly return ONLY raw JSON matching the schema and nothing else.\n\n{input_payload}"
+    prompt = f"{TECH_LEAD_SYSTEM_PROMPT}\n\nStrictly return ONLY raw JSON matching the schema without markdown fences or commentary.\n\n{input_payload}"
     try:
-        cmd = [agy_bin, "-p", prompt, "--dangerously-skip-permissions"]
+        cmd = [agy_bin, "--model", "gemini-3.8-flash-high", "--dangerously-skip-permissions", "-p", prompt]
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        await proc.communicate()
-        brain_dir = Path.home() / ".gemini" / "antigravity-cli" / "brain"
-        if brain_dir.exists():
-            dirs = sorted(brain_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
-            if dirs:
-                log_file = dirs[0] / ".system_generated" / "logs" / "transcript.jsonl"
-                if log_file.exists():
-                    with open(log_file, "r", encoding="utf-8") as f:
-                        for line in f:
-                            obj = json.loads(line)
-                            if obj.get("type") == "PLANNER_RESPONSE":
-                                content = obj.get("content", "").strip()
-                                if "```json" in content:
-                                    content = content.split("```json")[1].split("```")[0].strip()
-                                elif "```" in content:
-                                    content = content.split("```")[1].split("```")[0].strip()
-                                try:
-                                    return {"ok": True, "json": json.loads(content)}
-                                except Exception as e:
-                                    return {"ok": False, "error": str(e), "raw": content}
-        return {"ok": False, "error": "Transcript not found"}
+        stdout, stderr = await proc.communicate()
+        raw_text = stdout.decode("utf-8", errors="replace").strip()
+        
+        if raw_text:
+            content = raw_text
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
+            start_b = content.find('{')
+            end_b = content.rfind('}')
+            if start_b != -1 and end_b != -1 and end_b > start_b:
+                content = content[start_b:end_b + 1]
+            try:
+                return {"ok": True, "json": json.loads(content)}
+            except Exception as e:
+                return {"ok": False, "error": f"JSON parse error: {str(e)}", "raw": raw_text[:300]}
+
+        return {"ok": False, "error": f"CLI produced no output. Stderr: {stderr.decode('utf-8', errors='replace')[:200]}"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
 
 
 async def architect_task(
