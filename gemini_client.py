@@ -197,9 +197,10 @@ class GeminiClient:
                 if system_instruction:
                     full_prompt = f"System instructions:\n{system_instruction}\n\nUser request:\n{full_prompt}"
                 if json_output:
-                    full_prompt = f"{full_prompt}\n\nIMPORTANT: Output MUST be strictly valid JSON without markdown fences."
+                    full_prompt = f"{full_prompt}\n\nIMPORTANT: Output MUST be strictly valid JSON without any markdown fences, preambles, or explanations."
 
-                p = subprocess.run([agy_bin, "--model", agy_model, "-p", full_prompt], capture_output=True, text=True, encoding="utf-8")
+                cmd = [agy_bin, "--model", agy_model, "--dangerously-skip-permissions", "-p", full_prompt]
+                p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
                 if p.returncode == 0 and p.stdout.strip():
                     text = p.stdout.strip()
                     result = {
@@ -218,10 +219,18 @@ class GeminiClient:
                                 clean_text = clean_text[3:]
                             if clean_text.endswith("```"):
                                 clean_text = clean_text[:-3]
-                            result["json"] = json.loads(clean_text.strip())
+                            clean_text = clean_text.strip()
+                            # Locate the first '{' and last '}'
+                            start_brace = clean_text.find('{')
+                            end_brace = clean_text.rfind('}')
+                            if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
+                                clean_text = clean_text[start_brace:end_brace + 1]
+                            result["json"] = json.loads(clean_text)
                         except Exception as je:
                             result["json_error"] = str(je)
                     return result
+                elif p.stderr:
+                    last_error += f" | CLI stderr: {p.stderr.strip()[:200]}"
         except Exception as cli_err:
             last_error += f" | CLI fallback error: {str(cli_err)}"
 

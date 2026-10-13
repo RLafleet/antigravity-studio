@@ -7,6 +7,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable
 
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
 from config import (
     load_config, save_config,
     load_day_plan, save_day_plan,
