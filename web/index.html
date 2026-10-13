@@ -537,6 +537,9 @@
             <button onclick="openDebateModal('tech_lead')" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-medium text-cyan-300 border border-cyan-500/30 transition flex items-center gap-1.5" title="Запустить автономный спор Техдира и Директора">
               <span>🤝</span> Дебаты с Директором
             </button>
+            <button onclick="copyBoardChat('tech_lead')" class="px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-medium text-gray-300 border border-gray-700 transition flex items-center gap-1.5" title="Скопировать весь диалог">
+              <span>📋</span> Копировать всё
+            </button>
             <button onclick="clearBoardChat('tech_lead')" class="p-1.5 rounded-lg bg-gray-800 hover:bg-red-900/40 text-gray-400 hover:text-red-300 border border-gray-700 transition text-xs" title="Очистить историю">
               🗑️
             </button>
@@ -584,6 +587,9 @@
             </button>
             <button onclick="openDebateModal('director')" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-medium text-emerald-300 border border-emerald-500/30 transition flex items-center gap-1.5" title="Поставить задачу Техдиру на обсуждение">
               <span>🤝</span> Задача Техдиру (Дебаты)
+            </button>
+            <button onclick="copyBoardChat('director')" class="px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-medium text-gray-300 border border-gray-700 transition flex items-center gap-1.5" title="Скопировать весь диалог">
+              <span>📋</span> Копировать всё
             </button>
             <button onclick="clearBoardChat('director')" class="p-1.5 rounded-lg bg-gray-800 hover:bg-red-900/40 text-gray-400 hover:text-red-300 border border-gray-700 transition text-xs" title="Очистить историю">
               🗑️
@@ -2338,14 +2344,18 @@
     function renderBoardMessageBubble(container, msg, currentRole) {
       const isUser = msg.sender === 'Пользователь' || msg.sender === 'Инвестор';
       const bubble = document.createElement('div');
-      bubble.className = isUser ? "flex justify-end" : "flex justify-start";
+      bubble.className = isUser ? "flex justify-end group" : "flex justify-start group";
+      bubble.dataset.rawText = msg.text || '';
 
       if (isUser) {
         bubble.innerHTML = `
-          <div class="max-w-[80%] bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-3.5 text-xs text-gray-100 shadow-md">
+          <div class="max-w-[80%] bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-3.5 text-xs text-gray-100 shadow-md relative">
             <div class="flex items-center justify-between gap-3 mb-1 text-[10px] text-indigo-300">
               <span class="font-semibold">Вы (Инвестор / Партнер)</span>
-              <span class="font-mono text-gray-400">${msg.time || ''}</span>
+              <div class="flex items-center gap-1.5">
+                <span class="font-mono text-gray-400">${msg.time || ''}</span>
+                <button onclick="copySingleMessage(this)" class="opacity-40 group-hover:opacity-100 hover:text-white p-0.5 rounded text-[11px] transition" title="Скопировать сообщение">📋</button>
+              </div>
             </div>
             <div class="leading-relaxed whitespace-pre-wrap">${formatBoardText(msg.text)}</div>
           </div>
@@ -2358,7 +2368,7 @@
         const badge = isTechLead ? 'Principal Tech Lead' : '⭐ Telegram Stars & Revenue';
 
         bubble.innerHTML = `
-          <div class="max-w-[85%] bg-gray-950/80 border border-${accentColor}-500/30 rounded-2xl p-4 text-xs text-gray-200 shadow-lg">
+          <div class="max-w-[85%] bg-gray-950/80 border border-${accentColor}-500/30 rounded-2xl p-4 text-xs text-gray-200 shadow-lg relative">
             <div class="flex items-center justify-between gap-3 mb-2 pb-1.5 border-b border-gray-800">
               <div class="flex items-center gap-2">
                 <span class="text-base">${icon}</span>
@@ -2368,6 +2378,7 @@
               <div class="flex items-center gap-2">
                 <span class="text-[10px] text-purple-300 font-mono">${msg.model || 'gemini-3.8-flash-high'}</span>
                 <span class="text-[10px] font-mono text-gray-400">${msg.time || ''}</span>
+                <button onclick="copySingleMessage(this)" class="opacity-40 group-hover:opacity-100 hover:text-white p-0.5 rounded text-[11px] transition" title="Скопировать сообщение">📋</button>
               </div>
             </div>
             <div class="leading-relaxed text-gray-300 text-xs">${formatBoardText(msg.text)}</div>
@@ -2375,6 +2386,74 @@
         `;
       }
       container.appendChild(bubble);
+    }
+
+    function copyToClipboard(text, successMsg = "Скопировано в буфер обмена!") {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(successMsg);
+        }).catch(() => {
+          fallbackCopy(text, successMsg);
+        });
+      } else {
+        fallbackCopy(text, successMsg);
+      }
+    }
+
+    function fallbackCopy(text, successMsg) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast(successMsg);
+      } catch (err) {
+        alert("Не удалось скопировать: " + err);
+      }
+      document.body.removeChild(ta);
+    }
+
+    function showToast(msg) {
+      const existing = document.getElementById('studio-toast');
+      if (existing) existing.remove();
+      const toast = document.createElement('div');
+      toast.id = 'studio-toast';
+      toast.className = 'fixed bottom-6 right-6 z-50 bg-indigo-600 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 transition duration-300';
+      toast.innerHTML = `<span>📋</span><span>${msg}</span>`;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        if (toast) toast.remove();
+      }, 2500);
+    }
+
+    function copySingleMessage(btn) {
+      const bubble = btn.closest('[data-raw-text]');
+      if (bubble && bubble.dataset.rawText) {
+        copyToClipboard(bubble.dataset.rawText, "Сообщение скопировано!");
+      }
+    }
+
+    async function copyBoardChat(role) {
+      try {
+        const res = await fetch(`${API_BASE}/api/board/history?role=${role}`);
+        const data = await res.json();
+        const history = (data && data.history) || [];
+        if (history.length === 0) {
+          alert("Диалог пока пуст.");
+          return;
+        }
+        const roleTitle = role === 'tech_lead' ? 'Техдир (Архитектор)' : 'Директор (Бизнес)';
+        let fullText = `=== ДИАЛОГ С ${roleTitle.toUpperCase()} ===\n\n`;
+        history.forEach(m => {
+          fullText += `[${m.time || ''}] ${m.sender || 'Собеседник'}:\n${m.text}\n\n----------------------------------------\n\n`;
+        });
+        copyToClipboard(fullText, `Весь диалог скопирован в буфер обмена!`);
+      } catch (e) {
+        alert("Ошибка копирования диалога: " + e);
+      }
     }
 
     async function sendBoardMessage(role) {
