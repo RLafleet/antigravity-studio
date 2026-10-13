@@ -14,7 +14,8 @@ from pydantic import BaseModel
 
 from config import (
     load_config, save_config, load_history,
-    upsert_task_history, get_task_by_id, HISTORY_FILE
+    upsert_task_history, get_task_by_id, HISTORY_FILE,
+    load_day_plan, save_day_plan, DAY_PLAN_FILE
 )
 from gemini_client import GeminiClient
 from spec_architect import (
@@ -27,6 +28,7 @@ from test_engine import (
     validate_narrative_configs, run_custom_command
 )
 from git_manager import get_git_status, git_commit_and_push
+from day_orchestrator import DayOrchestrator
 
 app = FastAPI(title="Antigravity Studio API", version="2.0.0")
 
@@ -41,8 +43,14 @@ app.add_middleware(
 active_worker: Optional[WorkerEngine] = None
 
 
+active_day_orchestrator: Optional[DayOrchestrator] = None
+active_day_task: Optional[asyncio.Task] = None
+
+
 class ConfigModel(BaseModel):
     gemini_api_key: Optional[str] = None
+    gemini_api_key_a: Optional[str] = None
+    gemini_api_key_b: Optional[str] = None
     orchestrator_model: Optional[str] = None
     thinking_level: Optional[str] = None
     default_workspace: Optional[str] = None
@@ -50,6 +58,12 @@ class ConfigModel(BaseModel):
     execution_mode: Optional[str] = None
     agy_executable: Optional[str] = None
     github_username: Optional[str] = None
+    day_cooldown_seconds: Optional[int] = None
+
+
+class DayGoalRequest(BaseModel):
+    goal: str
+    workspace_path: Optional[str] = None
 
 
 class ScanRequest(BaseModel):
@@ -273,6 +287,71 @@ async def test_lore(req: ScanRequest):
 async def test_custom(req: CustomCommandRequest):
     """Executes any custom test or build command."""
     return await run_custom_command(req.command, req.workspace_path)
+
+
+# --- Day Plan (Slow & Steady Daemon) Endpoints ---
+
+@app.get("/api/day_plan")
+async def get_day_plan_api():
+    plan = load_day_plan()
+    is_running = active_day_orchestrator is not None and active_day_orchestrator.is_running
+    is_paused = active_day_orchestrator is not None and active_day_orchestrator.is_paused
+    return {
+        "ok": True,
+        "plan": plan,
+        "is_running": is_running,
+        "is_paused": is_paused
+    }
+
+
+@app.post("/api/day_plan/create")
+async def create_day_plan_api(req: DayGoalRequest):
+    global active_day_orchestrator
+    cfg = load_config()
+    ws = req.workspace_path or cfg.get("default_workspace", "")
+    active_day_orchestrator = DayOrchestrator(workspace_path=ws)
+    res = await active_day_orchestrator.create_plan(req.goal)
+    return res
+
+
+@app.post("/api/day_plan/start")
+async def start_day_plan_api(req: Optional[ScanRequest] = None):
+    global active_day_orchestrator, active_day_task
+    cfg = load_config()
+    ws = req.workspace_path if req else cfg.get("default_workspace", "")
+    if not active_day_orchestrator:
+        active_day_orchestrator = DayOrchestrator(workspace_path=ws)
+
+    if not active_day_task or active_day_task.done():
+        active_day_task = asyncio.create_task(active_day_orchestrator.run_pipeline())
+        return {"ok": True, "message": "Конвейер дневной задачи запущен в фоне (Slow & Steady)"}
+    return {"ok": True, "message": "Конвейер уже запущен"}
+
+
+@app.post("/api/day_plan/pause")
+async def pause_day_plan_api():
+    global active_day_orchestrator
+    if active_day_orchestrator:
+        active_day_orchestrator.pause()
+        return {"ok": True, "message": "Пауза запрошена"}
+    return {"ok": False, "error": "Конвейер не активен"}
+
+
+@app.post("/api/day_plan/clear")
+async def clear_day_plan_api():
+    global active_day_orchestrator, active_day_task
+    if active_day_orchestrator:
+        active_day_orchestrator.pause()
+    if active_day_task and not active_day_task.done():
+        active_day_task.cancel()
+    if DAY_PLAN_FILE.exists():
+        try:
+            DAY_PLAN_FILE.unlink()
+        except Exception:
+            pass
+    active_day_orchestrator = None
+    active_day_task = None
+    return {"ok": True, "message": "План на день очищен"}
 
 
 # --- Git Endpoints ---

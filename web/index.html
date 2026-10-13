@@ -88,6 +88,9 @@
         <span class="text-base">⚡</span> Мониторинг
         <span id="monitor-badge" class="hidden ml-auto w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
       </button>
+      <button onclick="switchTab('day-runner')" id="tab-btn-day-runner" class="nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-amber-400 hover:text-white hover:bg-gray-800/60 transition">
+        <span class="text-base">🐢</span> Задача на день (Slow)
+      </button>
       <button onclick="switchTab('playbooks')" id="tab-btn-playbooks" class="nav-btn flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800/60 transition">
         <span class="text-base">📋</span> Шаблоны / Playbooks
       </button>
@@ -407,6 +410,99 @@
         </div>
       </section>
 
+      <!-- ================= TAB: DAY RUNNER (SLOW & STEADY) ================= -->
+      <section id="tab-day-runner" class="tab-pane hidden flex flex-col gap-5 max-w-4xl mx-auto w-full">
+        <div class="flex items-center justify-between">
+          <div class="flex flex-col gap-1">
+            <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+              <span>🐢</span> Дневной конвейер (Slow & Steady Daemon)
+            </h2>
+            <p class="text-xs text-gray-400">
+              Основное правило: <b>«Никакой спешки. Медленно, размеренно, на 100% надежно»</b>. Чекпоинты в Git, ротация 2-х ключей, охлаждение квот.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="fetchDayPlan()" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-300 transition flex items-center gap-1">
+              <span>🔄</span> Обновить
+            </button>
+          </div>
+        </div>
+
+        <!-- Create Day Plan Box -->
+        <div id="day-create-box" class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl flex flex-col gap-4">
+          <label class="text-xs text-gray-300 font-semibold flex items-center gap-2">
+            <span>🎯</span> Большая задача на день:
+          </label>
+          <textarea
+            id="day-goal-input"
+            rows="3"
+            placeholder="Опиши крупную задачу (например: «Сделать полную механику кланов: схемы БД, контроллеры Fastify, валидацию транзакций, защиту от двойных списаний и интеграционные тесты»)..."
+            class="bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs text-white focus:outline-none focus:border-amber-500/50 transition"
+          ></textarea>
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-[11px] text-gray-500">
+              Оркестратор (Gemini High) проснется один раз, разобьет задачу на 4–8 микро-шагов и сразу уснет (0 токенов в ожидании).
+            </span>
+            <button
+              onclick="createDayPlan()"
+              id="btn-create-day-plan"
+              class="px-5 py-2.5 rounded-lg bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white font-medium text-xs transition flex items-center gap-2 shadow-lg shadow-amber-600/20 whitespace-nowrap"
+            >
+              <span>🧠</span> Спланировать день
+            </button>
+          </div>
+        </div>
+
+        <!-- Active Day Plan Display -->
+        <div id="day-active-box" class="hidden flex flex-col gap-5">
+          <!-- Status Banner -->
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span id="day-status-badge" class="px-2.5 py-0.5 rounded text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">В ПРОЦЕССЕ</span>
+                <h3 id="day-goal-title" class="text-sm font-bold text-white">Цель на день</h3>
+              </div>
+              <p id="day-progress-text" class="text-xs text-gray-400 mt-1">Шаг 0 из 0 &middot; Кулдаун между шагами: 120 сек</p>
+              
+              <!-- Progress Bar -->
+              <div class="w-full bg-gray-950 rounded-full h-2 mt-3 overflow-hidden border border-gray-800">
+                <div id="day-progress-bar" class="bg-gradient-to-r from-amber-500 to-emerald-400 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+              <button onclick="startDayPlan()" id="btn-start-day" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/30">
+                <span>▶</span> Запустить
+              </button>
+              <button onclick="pauseDayPlan()" id="btn-pause-day" class="px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium text-xs transition flex items-center gap-1.5">
+                <span>⏸</span> Пауза
+              </button>
+              <button onclick="clearDayPlan()" class="px-3 py-2 rounded-lg bg-gray-800 hover:bg-red-900/40 text-gray-400 hover:text-red-300 text-xs transition" title="Очистить и сбросить план">
+                <span>🗑️</span> Сброс
+              </button>
+            </div>
+          </div>
+
+          <!-- Micro-Steps List -->
+          <div class="flex flex-col gap-2">
+            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Микро-шаги (Atomic Queue):</h4>
+            <div id="day-steps-list" class="space-y-2.5">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <!-- Live Day Logs -->
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl flex flex-col gap-2">
+            <span class="text-xs text-gray-400 font-semibold flex items-center gap-2">
+              <span>📜</span> Журнал размеренного конвейера:
+            </span>
+            <div id="day-logs-box" class="h-44 overflow-y-auto bg-gray-950 rounded-lg p-3 border border-gray-800 font-mono text-xs text-gray-300 space-y-1">
+              <!-- Logs -->
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ================= TAB: PLAYBOOKS ================= -->
       <section id="tab-playbooks" class="tab-pane hidden flex flex-col gap-5 max-w-4xl mx-auto w-full">
         <div class="flex items-center justify-between">
@@ -608,24 +704,46 @@
         </div>
 
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl space-y-4">
-          <!-- Gemini API Key -->
-          <div>
-            <label class="block text-xs font-semibold text-gray-300 mb-1.5">Gemini API Key</label>
-            <div class="flex items-center gap-2">
+          <!-- Dual Keys: Key A & Key B -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-gray-300 mb-1">Ключ Аккаунта A (Основной)</label>
               <input
                 type="password"
                 id="setting-gemini-key"
-                placeholder="AIzaSy... или AQ.Ab..."
-                class="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 mono outline-none focus:border-indigo-500"
+                placeholder="AIzaSy... (Аккаунт 1)"
+                class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 mono outline-none focus:border-indigo-500"
               />
-              <button
-                onclick="testApiKey()"
-                class="px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-indigo-300 font-medium transition"
-              >
-                Проверить
-              </button>
             </div>
-            <p class="text-[11px] text-gray-500 mt-1">По ключу автоматически подтягиваются все доступные модели вашего аккаунта.</p>
+            <div>
+              <label class="block text-xs font-semibold text-gray-300 mb-1">Ключ Аккаунта B (Второй аккаунт)</label>
+              <input
+                type="password"
+                id="setting-gemini-key-b"
+                placeholder="AIzaSy... (Аккаунт 2)"
+                class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 mono outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-[11px] text-gray-500">
+            <span>Ротация между ключами позволяет чередовать нагрузку и обходить лимиты.</span>
+            <button onclick="testApiKey()" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-indigo-300 font-medium transition">
+              Проверить ключи
+            </button>
+          </div>
+
+          <!-- Cooldown Setting -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-300 mb-1">Пауза охлаждения квот между шагами (секунды)</label>
+            <input
+              type="number"
+              id="setting-day-cooldown"
+              value="120"
+              min="30"
+              max="600"
+              class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 mono outline-none focus:border-indigo-500"
+            />
+            <p class="text-[11px] text-gray-500 mt-1">Рекомендуется 120–180 сек. Основное правило: «Никакой спешки: медленно, но надежно».</p>
           </div>
 
           <!-- Model selection -->
@@ -732,7 +850,14 @@
         appConfig = await res.json();
         
         document.getElementById('current-workspace-label').textContent = appConfig.default_workspace || "Не выбрана";
-        document.getElementById('setting-gemini-key').value = appConfig.gemini_api_key || "";
+        const keyA = appConfig.gemini_api_key_a || appConfig.gemini_api_key || "";
+        document.getElementById('setting-gemini-key').value = keyA;
+        if (document.getElementById('setting-gemini-key-b')) {
+          document.getElementById('setting-gemini-key-b').value = appConfig.gemini_api_key_b || "";
+        }
+        if (document.getElementById('setting-day-cooldown')) {
+          document.getElementById('setting-day-cooldown').value = appConfig.day_cooldown_seconds || 120;
+        }
         document.getElementById('setting-exec-mode').value = appConfig.execution_mode || "auto";
         currentThinkingLevel = (appConfig.thinking_level || "high").toLowerCase();
         setThinkingLevel(currentThinkingLevel, false);
@@ -880,6 +1005,7 @@
       if (tabId === 'history') loadHistoryView();
       if (tabId === 'playbooks') loadPlaybooksView();
       if (tabId === 'git') loadGitView();
+      if (tabId === 'day-runner') fetchDayPlan();
     }
 
     // --- PLAYBOOKS LOGIC ---
@@ -1670,7 +1796,9 @@
     }
 
     async function saveSettings() {
-      const key = document.getElementById('setting-gemini-key').value.trim();
+      const keyA = document.getElementById('setting-gemini-key').value.trim();
+      const keyB = document.getElementById('setting-gemini-key-b') ? document.getElementById('setting-gemini-key-b').value.trim() : "";
+      const cooldown = document.getElementById('setting-day-cooldown') ? parseInt(document.getElementById('setting-day-cooldown').value) : 120;
       const model = document.getElementById('setting-model-select').value;
       const thinking = document.getElementById('setting-thinking-select').value;
       const mode = document.getElementById('setting-exec-mode').value;
@@ -1679,7 +1807,10 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          gemini_api_key: key,
+          gemini_api_key: keyA,
+          gemini_api_key_a: keyA,
+          gemini_api_key_b: keyB,
+          day_cooldown_seconds: cooldown,
           orchestrator_model: model,
           thinking_level: thinking,
           execution_mode: mode
@@ -1688,6 +1819,191 @@
       await loadConfig();
       await loadModelsCatalog();
       alert("Настройки успешно сохранены!");
+    }
+
+    // --- DAY RUNNER (SLOW & STEADY) LOGIC ---
+    let dayPlanPollInterval = null;
+
+    async function fetchDayPlan() {
+      try {
+        const res = await fetch(`${API_BASE}/api/day_plan`);
+        const data = await res.json();
+        const plan = data.plan;
+        const isRunning = data.is_running;
+        const isPaused = data.is_paused;
+
+        const createBox = document.getElementById('day-create-box');
+        const activeBox = document.getElementById('day-active-box');
+
+        if (!plan) {
+          createBox.classList.remove('hidden');
+          activeBox.classList.add('hidden');
+          if (dayPlanPollInterval) clearInterval(dayPlanPollInterval);
+          return;
+        }
+
+        createBox.classList.add('hidden');
+        activeBox.classList.remove('hidden');
+
+        document.getElementById('day-goal-title').textContent = plan.goal_summary_ru || plan.goal;
+        
+        const badge = document.getElementById('day-status-badge');
+        if (plan.status === 'completed') {
+          badge.className = "px-2.5 py-0.5 rounded text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+          badge.textContent = "✓ ЗАВЕРШЕНО НА 100%";
+        } else if (isPaused || plan.status === 'paused') {
+          badge.className = "px-2.5 py-0.5 rounded text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20";
+          badge.textContent = "⏸ НА ПАУЗЕ";
+        } else if (isRunning || plan.status === 'in_progress') {
+          badge.className = "px-2.5 py-0.5 rounded text-xs font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 animate-pulse";
+          badge.textContent = "⏳ ВЫПОЛНЯЕТСЯ (SLOW)";
+        } else {
+          badge.className = "px-2.5 py-0.5 rounded text-xs font-bold bg-gray-500/10 text-gray-400 border border-gray-500/20";
+          badge.textContent = plan.status.toUpperCase();
+        }
+
+        const completedCount = (plan.steps || []).filter(s => s.status === 'completed').length;
+        const totalCount = (plan.steps || []).length;
+        const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+        document.getElementById('day-progress-text').textContent = `Шаг ${completedCount} из ${totalCount} (${pct}%) · Кулдаун: ${plan.cooldown_seconds || 120} сек`;
+        document.getElementById('day-progress-bar').style.width = `${pct}%`;
+
+        // Render Steps List
+        const listContainer = document.getElementById('day-steps-list');
+        listContainer.innerHTML = "";
+
+        (plan.steps || []).forEach((step, idx) => {
+          let icon = "⚪";
+          let borderCol = "border-gray-800";
+          let bgCol = "bg-gray-950";
+          let statusLabel = "Ожидание";
+
+          if (step.status === 'completed') {
+            icon = "✓";
+            borderCol = "border-emerald-500/30";
+            bgCol = "bg-emerald-950/20";
+            statusLabel = "Завершено и зафиксировано в Git";
+          } else if (step.status === 'running') {
+            icon = "⏳";
+            borderCol = "border-amber-500/40";
+            bgCol = "bg-amber-950/20";
+            statusLabel = "Выполняется прямо сейчас...";
+          } else if (step.status === 'verifying') {
+            icon = "🔍";
+            borderCol = "border-cyan-500/40";
+            bgCol = "bg-cyan-950/20";
+            statusLabel = "Тестирование и проверка качества...";
+          }
+
+          listContainer.innerHTML += `
+            <div class="${bgCol} border ${borderCol} rounded-xl p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow transition">
+              <div class="flex items-center gap-3">
+                <span class="w-6 h-6 rounded-full bg-gray-900 border border-gray-700 flex items-center justify-center text-xs font-bold font-mono text-gray-300">
+                  ${icon}
+                </span>
+                <div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs font-semibold text-white">Шаг ${idx + 1}: ${step.title || step.title_en}</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-400 font-mono font-medium">${(step.thinking_level || 'MED').toUpperCase()}</span>
+                  </div>
+                  <p class="text-[11px] text-gray-400 mt-0.5">${step.objective || ''}</p>
+                </div>
+              </div>
+              <div class="text-right shrink-0">
+                <span class="text-[11px] text-gray-500 font-mono">${statusLabel}</span>
+                ${step.completed_at ? `<div class="text-[10px] text-emerald-400 font-mono">в ${step.completed_at}</div>` : ''}
+              </div>
+            </div>
+          `;
+        });
+
+        // Render Logs
+        const logsBox = document.getElementById('day-logs-box');
+        if (plan.logs && plan.logs.length > 0) {
+          logsBox.innerHTML = plan.logs.map(l => `<div><span class="text-gray-500">[${l.time}]</span> ${l.msg}</div>`).join('');
+          logsBox.scrollTop = logsBox.scrollHeight;
+        } else {
+          logsBox.innerHTML = `<span class="text-gray-500 italic">Событий пока нет. Нажмите «Запустить».</span>`;
+        }
+
+        // Keep polling if running
+        if ((isRunning || plan.status === 'in_progress') && !dayPlanPollInterval) {
+          dayPlanPollInterval = setInterval(fetchDayPlan, 4000);
+        } else if (!isRunning && plan.status !== 'in_progress' && dayPlanPollInterval) {
+          clearInterval(dayPlanPollInterval);
+          dayPlanPollInterval = null;
+        }
+
+      } catch (e) {
+        console.error("fetchDayPlan error:", e);
+      }
+    }
+
+    async function createDayPlan() {
+      const goal = document.getElementById('day-goal-input').value.trim();
+      if (!goal) {
+        alert("Опишите задачу на день.");
+        return;
+      }
+      const btn = document.getElementById('btn-create-day-plan');
+      btn.disabled = true;
+      btn.innerHTML = `<span>⏳ Gemini High декомпозирует...</span>`;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/day_plan/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ goal, workspace_path: appConfig.default_workspace })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          fetchDayPlan();
+        } else {
+          alert("Ошибка планирования: " + (data.error || "Неизвестная ошибка"));
+        }
+      } catch (e) {
+        alert("Ошибка связи: " + e);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>🧠</span> Спланировать день`;
+      }
+    }
+
+    async function startDayPlan() {
+      try {
+        const res = await fetch(`${API_BASE}/api/day_plan/start`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workspace_path: appConfig.default_workspace })
+        });
+        const data = await res.json();
+        if (!dayPlanPollInterval) {
+          dayPlanPollInterval = setInterval(fetchDayPlan, 3000);
+        }
+        fetchDayPlan();
+      } catch (e) {
+        alert("Ошибка запуска: " + e);
+      }
+    }
+
+    async function pauseDayPlan() {
+      try {
+        await fetch(`${API_BASE}/api/day_plan/pause`, { method: "POST" });
+        fetchDayPlan();
+      } catch (e) {
+        alert("Ошибка паузы: " + e);
+      }
+    }
+
+    async function clearDayPlan() {
+      if (!confirm("Очистить и сбросить текущий план на день?")) return;
+      try {
+        await fetch(`${API_BASE}/api/day_plan/clear`, { method: "POST" });
+        fetchDayPlan();
+      } catch (e) {
+        alert("Ошибка сброса: " + e);
+      }
     }
 
     // Startup

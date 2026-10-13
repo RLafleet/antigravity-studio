@@ -11,8 +11,12 @@ LEGACY_APP_DIR = Path.home() / ".agy_orchestrator"
 LEGACY_CONFIG_FILE = LEGACY_APP_DIR / "config.json"
 LEGACY_HISTORY_FILE = LEGACY_APP_DIR / "task_history.json"
 
+DAY_PLAN_FILE = APP_DIR / "day_plan.json"
+
 DEFAULT_CONFIG: Dict[str, Any] = {
     "gemini_api_key": os.getenv("GEMINI_API_KEY", ""),
+    "gemini_api_key_a": os.getenv("GEMINI_API_KEY_A", os.getenv("GEMINI_API_KEY", "")),
+    "gemini_api_key_b": os.getenv("GEMINI_API_KEY_B", ""),
     "orchestrator_model": "gemini-3.8-flash",
     "thinking_level": "high",  # 'high', 'medium', 'low', 'off'
     "default_workspace": str(Path.home() / ".gemini" / "antigravity" / "scratch" / "fitness_clicker"),
@@ -27,7 +31,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "antigravity_data_dir": str(Path.home() / ".gemini" / "antigravity"),
     "max_steps": 30,
     "temperature": 0.2,
-    "github_username": "RLafleet"
+    "github_username": "RLafleet",
+    "day_cooldown_seconds": 120,  # 2 minutes default steady cooldown
+    "auto_git_checkpoints": True
 }
 
 
@@ -122,3 +128,28 @@ def get_task_by_id(task_id: str) -> Optional[Dict[str, Any]]:
         if item.get("id") == task_id:
             return item
     return None
+
+
+def load_day_plan() -> Optional[Dict[str, Any]]:
+    """Loads active day plan from disk if exists."""
+    ensure_app_dirs()
+    if not DAY_PLAN_FILE.exists():
+        return None
+    try:
+        with open(DAY_PLAN_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def save_day_plan(plan_data: Dict[str, Any]) -> bool:
+    """Saves or updates active day plan on disk."""
+    ensure_app_dirs()
+    try:
+        with open(DAY_PLAN_FILE, "w", encoding="utf-8") as f:
+            json.dump(plan_data, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"Error saving day plan: {e}")
+        return False
+
