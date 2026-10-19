@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Goblin Idle Animation Preview</title>
+  <style>
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+    .stage {
+      width: 117px;
+      height: 384px;
+      margin: 20px auto;
+      background: radial-gradient(circle, #21262d 0%, #0d1117 70%);
+      border: 2px dashed #388bfd;
+      border-radius: 12px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .ground-line {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: rgba(56, 139, 253, 0.4);
+    }
+    #goblin-sprite {
+      max-width: 100%;
+      max-height: 100%;
+      image-rendering: auto;
+    }
+    .controls {
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: center;
+    }
+    button {
+      background: #238636;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover { background: #2ea043; }
+    input[type=range] { width: 140px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>👹 Тест анимации дыхания Гоблина (Idle Animation)</h2>
+    <p style="color: #8b949e; font-size: 13px;">6 кадров, нарезанных из спрайт-листа с альфа-каналом</p>
+    
+    <div class="stage">
+      <div class="ground-line"></div>
+      <img id="goblin-sprite" src="frame_0.png" />
+    </div>
+
+    <div class="controls">
+      <button id="btn-toggle" onclick="togglePlay()">⏸ Пауза</button>
+      <label>Скорость: <span id="fps-label">6</span> FPS</label>
+      <input type="range" min="1" max="15" value="6" oninput="changeFps(this.value)">
+    </div>
+    <div style="margin-top: 10px; font-size: 12px; color: #8b949e;">Кадр: <span id="frame-num">0</span> / 5</div>
+  </div>
+
+  <script>
+    const frames = ['frame_0.png', 'frame_1.png', 'frame_2.png', 'frame_3.png', 'frame_4.png', 'frame_5.png'];
+    let current = 0;
+    let fps = 6;
+    let playing = true;
+    let interval = null;
+
+    function nextFrame() {
+      current = (current + 1) % frames.length;
+      document.getElementById('goblin-sprite').src = frames[current];
+      document.getElementById('frame-num').textContent = current;
+    }
+
+    function start() {
+      if (interval) clearInterval(interval);
+      interval = setInterval(nextFrame, 1000 / fps);
+    }
+
+    function togglePlay() {
+      playing = !playing;
+      const btn = document.getElementById('btn-toggle');
+      if (playing) {
+        btn.textContent = "⏸ Пауза";
+        start();
+      } else {
+        btn.textContent = "▶️ Старт";
+        clearInterval(interval);
+      }
+    }
+
+    function changeFps(val) {
+      fps = parseInt(val);
+      document.getElementById('fps-label').textContent = fps;
+      if (playing) start();
+    }
+
+    start();
+  </script>
+</body>
+</html>

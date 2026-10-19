@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IronStrike 3D: Арена Босса (Скелетная Анимация)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.85; filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.6)); }
+      50% { opacity: 1; filter: drop-shadow(0 0 25px rgba(245, 158, 11, 0.9)); }
+    }
+    .animate-glow { animation: pulseGlow 2s infinite ease-in-out; }
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translate(-50%, 0) scale(0.9); }
+      50% { opacity: 1; transform: translate(-50%, -35px) scale(1.15); }
+      100% { opacity: 0; transform: translate(-50%, -65px) scale(1.0); }
+    }
+    .damage-float { animation: floatUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  </style>
+</head>
+<body class="bg-gray-950 text-white min-h-screen flex flex-col items-center justify-center p-3 select-none font-sans overflow-hidden">
+
+  <!-- Container -->
+  <div class="w-full max-w-4xl flex flex-col gap-3">
+
+    <!-- Top Navigation / Stats Header -->
+    <header class="flex justify-between items-center bg-gray-900/90 border border-gray-800 px-5 py-3 rounded-2xl shadow-xl backdrop-blur">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-rose-600 flex items-center justify-center text-xl shadow-lg shadow-rose-600/30">
+          🥊
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-black tracking-wider text-white">IRONSTRIKE 3D: АРЕНА</h1>
+            <span class="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full font-mono font-bold">3D SKELETAL RIG</span>
+          </div>
+          <p class="text-[11px] text-gray-400">Реальная физика скелета &bull; Toon Cel-Shading &bull; Мокап нокаута</p>
+        </div>
+      </div>
+
+      <!-- Skin Switcher & Stats -->
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-1.5 bg-gray-950/80 p-1 rounded-xl border border-gray-800">
+          <button id="btn-skin-lava" onclick="window.switchSkin('lava')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition bg-amber-500 text-gray-950 shadow">
+            🔥 Лава
+          </button>
+          <button id="btn-skin-toxic" onclick="window.switchSkin('toxic')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition text-gray-400 hover:text-white">
+            🧪 Яд
+          </button>
+          <button id="btn-skin-frost" onclick="window.switchSkin('frost')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition text-gray-400 hover:text-white">
+            ❄️ Лёд
+          </button>
+          <button id="btn-skin-original" onclick="window.switchSkin('original')" class="px-3 py-1.5 text-xs font-bold rounded-lg transition text-gray-400 hover:text-white">
+            🗿 Камень
+          </button>
+        </div>
+
+        <div class="flex items-center gap-1.5 bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-xl text-rose-300 font-bold font-mono text-xs">
+          <span class="text-sm">💪</span>
+          <span id="reps-counter">0</span>
+          <span class="text-[10px] text-gray-400 font-semibold">УДАРОВ</span>
+        </div>
+
+        <div class="flex items-center gap-3 text-right font-mono">
+          <div>
+            <div class="text-[10px] text-gray-400">FPS</div>
+            <div id="fps-counter" class="text-xs font-bold text-emerald-400">60 FPS</div>
+          </div>
+          <div>
+            <div class="text-[10px] text-gray-400">КОМБО</div>
+            <div id="combo-text" class="text-xs font-bold text-amber-400">x0</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Boss HP & Phygital Battle Status -->
+    <div class="flex flex-col gap-2 bg-gray-900/90 border border-gray-800 p-4 rounded-2xl shadow-inner">
+      <div class="flex justify-between items-center text-xs font-bold">
+        <div class="flex items-center gap-2">
+          <span id="boss-emoji" class="text-xl">🔥</span>
+          <span id="boss-title" class="text-white font-extrabold tracking-tight text-sm">Магма-Титан (PBR Лава)</span>
+          <span id="boss-badge" class="text-[10px] text-amber-400 bg-amber-950/80 border border-amber-800/80 px-2 py-0.5 rounded font-mono font-bold">СТИХИЯ ОГНЯ</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span id="boss-phase-badge" class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2.5 py-0.5 rounded font-bold font-mono">ФАЗА: УВЕРЕННОСТЬ 😤</span>
+          <span id="hp-text" class="font-mono text-gray-200 text-xs font-bold">120 / 120 HP</span>
+        </div>
+      </div>
+      <div class="w-full bg-gray-950 h-5 rounded-full overflow-hidden border border-gray-800 relative p-0.5 shadow-inner">
+        <div id="hp-ghost-bar" class="absolute left-0.5 top-0.5 bottom-0.5 bg-amber-400 transition-all duration-500 ease-out rounded-full" style="width: calc(100% - 4px);"></div>
+        <div id="hp-main-bar" class="absolute left-0.5 top-0.5 bottom-0.5 bg-gradient-to-r from-rose-600 via-red-500 to-amber-500 transition-all duration-100 rounded-full shadow-[0_0_15px_rgba(244,63,94,0.7)]" style="width: calc(100% - 4px);"></div>
+      </div>
+    </div>
+
+    <!-- 3D Viewport Box -->
+    <div id="canvas-container" class="relative w-full h-[470px] bg-black border border-gray-800 rounded-2xl overflow-hidden shadow-2xl cursor-pointer group" onclick="triggerPunch()">
+
+      <!-- Loading Spinner Screen -->
+      <div id="loading-overlay" class="absolute inset-0 z-50 bg-gray-950 flex flex-col items-center justify-center gap-3 transition-opacity duration-300">
+        <div class="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+        <div id="loading-msg" class="text-sm font-mono text-amber-400 font-bold tracking-wider">ЗАГРУЗКА 3D СКЕЛЕТА И АНИМАЦИЙ...</div>
+        <div id="loading-progress" class="text-xs text-gray-400 font-mono">0%</div>
+      </div>
+
+      <!-- Damage Popups Container -->
+      <div id="damage-container" class="absolute inset-0 pointer-events-none z-30 overflow-hidden"></div>
+
+      <!-- Hit Flash Overlay (Whiteout on punch impact) -->
+      <div id="hit-flash" class="absolute inset-0 bg-white pointer-events-none opacity-0 transition-opacity duration-75 z-20"></div>
+
+      <!-- Floating Arcade KO Banner (Boss Defeated) -->
+      <div id="ko-banner" class="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none opacity-0 transition-all duration-500 z-40 bg-gray-950/90 border border-amber-500/70 px-7 py-3 rounded-2xl backdrop-blur-md shadow-[0_10px_40px_rgba(0,0,0,0.9)] max-w-sm w-[90%] text-center">
+        <div class="flex items-center gap-2 text-3xl font-black text-amber-400 tracking-wider drop-shadow-[0_2px_15px_rgba(251,191,36,0.9)]">
+          <span>🏆</span>
+          <span class="bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-300 bg-clip-text text-transparent">НОКАУТ!</span>
+          <span>🏆</span>
+        </div>
+        <p class="text-xs text-gray-200 mt-1 font-semibold">3D-монстр повержен и лежит на каменных плитах!</p>
+        <div class="mt-2 flex items-center justify-center gap-3 text-xs font-mono">
+          <span class="text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-800 font-bold">+250 XP ⚡</span>
+          <span id="ko-reps-display" class="text-rose-300 bg-rose-950/80 px-2.5 py-0.5 rounded border border-rose-800 font-bold">0 УДАРОВ 💪</span>
+        </div>
+        <button onclick="event.stopPropagation(); resetFight();" class="mt-3 px-6 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 font-black text-xs pointer-events-auto shadow-lg shadow-amber-500/30 transition active:scale-95 flex items-center gap-1.5 mx-auto">
+          <span>🔄</span> <span>Начать заново</span>
+        </button>
+      </div>
+
+      <!-- Bottom Hint -->
+      <div class="absolute bottom-2.5 right-3 text-[10px] font-mono text-gray-400/80 pointer-events-none z-20">
+        ПРОБЕЛ = Джеб &bull; Клик = Хук &bull; Реакция скелета &bull; Фазы эмоций
+      </div>
+    </div>
+
+    <!-- Controls Bar -->
+    <div class="flex items-center gap-3">
+      <button onclick="triggerPunch('left')" class="flex-1 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-sm rounded-2xl shadow-lg shadow-rose-600/30 transition active:scale-98 flex items-center justify-center gap-2">
+        <span>🥊</span> <span>ЛЕВЫЙ ДЖЕБ (ПРОБЕЛ)</span>
+      </button>
+
+      <button onclick="triggerPunch('right')" class="flex-1 py-3.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-black text-sm rounded-2xl shadow-lg shadow-amber-600/30 transition active:scale-98 flex items-center justify-center gap-2">
+        <span>🥊</span> <span>ПРАВЫЙ ХУК (КЛИК)</span>
+      </button>
+
+      <button onclick="resetFight()" class="px-5 py-3.5 bg-gray-900 hover:bg-gray-800 border border-gray-700 text-gray-200 text-xs font-mono font-bold rounded-2xl transition active:scale-95">
+        🔄 Сброс
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Three.js 3D Core Script -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // --- COMBAT & FITNESS STATS STATE ---
+    let maxHp = 120;
+    let hp = 120;
+    let combo = 0;
+    let reps = 0;
+    let isDead = false;
+    let lastPunchSide = 'right';
+    let bossPhase = 'confidence'; // 'confidence' (>60%), 'tension' (40-60%), 'panic' (<40%)
+    let hitRecoil = 0;
+    let trauma = 0;
+
+    // --- SYNTHESIZED COMBAT AUDIO (Punch-Out SFX) ---
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    function playImpactSound(isCrit = false) {
+      try {
+        const ctx = getAudioContext();
+        const t = ctx.currentTime;
+
+        // Sub bass thump
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(isCrit ? 165 : 125, t);
+        osc.frequency.exponentialRampToValueAtTime(30, t + 0.22);
+        gain.gain.setValueAtTime(isCrit ? 1.0 : 0.8, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.24);
+
+        // Noise punch slap
+        const bufferSize = Math.floor(ctx.sampleRate * 0.08);
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+        }
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(isCrit ? 3200 : 2100, t);
+        const nGain = ctx.createGain();
+        nGain.gain.setValueAtTime(isCrit ? 0.65 : 0.45, t);
+        nGain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
+        noise.connect(filter);
+        filter.connect(nGain);
+        nGain.connect(ctx.destination);
+        noise.start(t);
+      } catch (e) {}
+    }
+
+    function playKoSound() {
+      try {
+        const ctx = getAudioContext();
+        const t = ctx.currentTime;
+
+        // Victory Gong / Heavy impact bell
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(220, t);
+        osc.frequency.exponentialRampToValueAtTime(55, t + 1.2);
+        gain.gain.setValueAtTime(1.0, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 1.25);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(440, t);
+        osc2.frequency.exponentialRampToValueAtTime(110, t + 0.8);
+        gain2.gain.setValueAtTime(0.6, t);
+        gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(t);
+        osc2.stop(t + 0.85);
+      } catch (e) {}
+    }
+
+    // --- THREE.JS SCENE SETUP ---
+    const container = document.getElementById('canvas-container');
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0c16);
+    scene.fog = new THREE.FogExp2(0x0a0c16, 0.08);
+
+    const camera = new THREE.PerspectiveCamera(48, width / height, 0.1, 100);
+    camera.position.set(0, 1.4, 1.6); // Eye level looking at boss center
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.25;
+    container.appendChild(renderer.domElement);
+
+    // --- LIGHTING (Dungeon Torch & Spotlights) ---
+    const ambientLight = new THREE.AmbientLight(0x1e293b, 1.4);
+    scene.add(ambientLight);
+
+    const torchLeft = new THREE.PointLight(0xf97316, 5.0, 10);
+    torchLeft.position.set(-2.8, 2.2, 0.0);
+    torchLeft.castShadow = true;
+    scene.add(torchLeft);
+
+    const torchRight = new THREE.PointLight(0xf59e0b, 5.0, 10);
+    torchRight.position.set(2.8, 2.2, 0.0);
+    torchRight.castShadow = true;
+    scene.add(torchRight);
+
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, 3.8);
+    rimLight.position.set(0, 3.5, -5.0);
+    scene.add(rimLight);
+
+    const keySpot = new THREE.SpotLight(0xffedd5, 7.0, 14, Math.PI / 4, 0.45, 1.0);
+    keySpot.position.set(0, 4.5, 0.8);
+    keySpot.target.position.set(0, 1.0, -2.5);
+    keySpot.castShadow = true;
+    keySpot.shadow.bias = -0.001;
+    scene.add(keySpot);
+    scene.add(keySpot.target);
+
+    // --- DUNGEON ARENA FLOOR (Stone Pavement) ---
+    const floorGeo = new THREE.PlaneGeometry(16, 16, 32, 32);
+    const floorCanvas = document.createElement('canvas');
+    floorCanvas.width = 512;
+    floorCanvas.height = 512;
+    const fctx = floorCanvas.getContext('2d');
+    fctx.fillStyle = '#0f1422';
+    fctx.fillRect(0, 0, 512, 512);
+
+    for (let row = 0; row < 8; row++) {
+      const y = row * 64;
+      const offsetX = (row % 2) * 32;
+      for (let col = -1; col < 9; col++) {
+        const x = col * 64 + offsetX;
+        const shade = Math.floor(18 + (col * 7 + row * 13) % 12);
+        fctx.fillStyle = `rgb(${shade}, ${shade + 4}, ${shade + 10})`;
+        fctx.fillRect(x + 2, y + 2, 60, 60);
+
+        fctx.strokeStyle = '#05070d';
+        fctx.lineWidth = 3;
+        fctx.strokeRect(x + 1, y + 1, 62, 62);
+      }
+    }
+    const floorTex = new THREE.CanvasTexture(floorCanvas);
+    floorTex.wrapS = THREE.RepeatWrapping;
+    floorTex.wrapT = THREE.RepeatWrapping;
+    floorTex.repeat.set(4, 4);
+
+    const floorMat = new THREE.MeshStandardMaterial({
+      map: floorTex,
+      roughness: 0.82,
+      metalness: 0.12
+    });
+    const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.position.y = 0;
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    // Dungeon Back Wall with Arch Stone Texture
+    const wallGeo = new THREE.PlaneGeometry(16, 10);
+    const wallCanvas = document.createElement('canvas');
+    wallCanvas.width = 512;
+    wallCanvas.height = 256;
+    const wctx = wallCanvas.getContext('2d');
+    wctx.fillStyle = '#0b0f19';
+    wctx.fillRect(0, 0, 512, 256);
+    for (let r = 0; r < 8; r++) {
+      const y = r * 32;
+      const off = (r % 2) * 32;
+      for (let c = -1; c < 9; c++) {
+        const x = c * 64 + off;
+        const s = 14 + ((c * 11 + r * 17) % 8);
+        wctx.fillStyle = `rgb(${s}, ${s + 2}, ${s + 6})`;
+        wctx.fillRect(x + 2, y + 2, 60, 28);
+        wctx.strokeStyle = '#04060a';
+        wctx.lineWidth = 2;
+        wctx.strokeRect(x + 1, y + 1, 62, 30);
+      }
+    }
+    const wallTex = new THREE.CanvasTexture(wallCanvas);
+    wallTex.wrapS = THREE.RepeatWrapping;
+    wallTex.wrapT = THREE.RepeatWrapping;
+    wallTex.repeat.set(2, 2);
+    const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.92 });
+    const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+    wallMesh.position.set(0, 4.5, -4.5);
+    scene.add(wallMesh);
+
+    // --- TOON GRADIENT PALETTE (Comic Cel-Shading) ---
+    const toonCanvas = document.createElement('canvas');
+    toonCanvas.width = 4;
+    toonCanvas.height = 1;
+    const tctx = toonCanvas.getContext('2d');
+    tctx.fillStyle = '#333333'; tctx.fillRect(0, 0, 1, 1);
+    tctx.fillStyle = '#666666'; tctx.fillRect(1, 0, 1, 1);
+    tctx.fillStyle = '#aaaaaa'; tctx.fillRect(2, 0, 1, 1);
+    tctx.fillStyle = '#ffffff'; tctx.fillRect(3, 0, 1, 1);
+    const toonGradient = new THREE.CanvasTexture(toonCanvas);
+    toonGradient.minFilter = THREE.NearestFilter;
+    toonGradient.magFilter = THREE.NearestFilter;
+
+    // --- FIRST-PERSON 3D BOXING GLOVES (Anchored to Camera) ---
+    const glovesGroup = new THREE.Group();
+    camera.add(glovesGroup);
+    scene.add(camera);
+
+    function createBoxingGlove(side = 'left') {
+      const g = new THREE.Group();
+      const isLeft = side === 'left';
+
+      const gloveGeo = new THREE.SphereGeometry(0.08, 28, 28);
+      gloveGeo.scale(1.0, 1.25, 1.15);
+      const gloveMat = new THREE.MeshToonMaterial({
+        color: 0xef4444, // Vibrant comic crimson red
+        gradientMap: toonGradient
+      });
+      const gloveMesh = new THREE.Mesh(gloveGeo, gloveMat);
+      gloveMesh.castShadow = true;
+      g.add(gloveMesh);
+
+      const thumbGeo = new THREE.SphereGeometry(0.038, 20, 20);
+      thumbGeo.scale(1.1, 0.8, 0.8);
+      const thumbMesh = new THREE.Mesh(thumbGeo, gloveMat);
+      thumbMesh.position.set(isLeft ? 0.055 : -0.055, -0.02, 0.03);
+      g.add(thumbMesh);
+
+      const cuffGeo = new THREE.CylinderGeometry(0.065, 0.07, 0.09, 20);
+      const cuffMat = new THREE.MeshToonMaterial({
+        color: 0xf8fafc, // Crisp white wrist wrap tape
+        gradientMap: toonGradient
+      });
+      const cuffMesh = new THREE.Mesh(cuffGeo, cuffMat);
+      cuffMesh.position.set(0, -0.09, -0.015);
+      cuffMesh.rotation.x = 0.25;
+      g.add(cuffMesh);
+
+      const armGeo = new THREE.CylinderGeometry(0.055, 0.065, 0.45, 16);
+      const armMat = new THREE.MeshToonMaterial({
+        color: 0x9a3412,
+        gradientMap: toonGradient
+      });
+      const armMesh = new THREE.Mesh(armGeo, armMat);
+      armMesh.position.set(0, -0.32, -0.06);
+      armMesh.rotation.x = 0.35;
+      g.add(armMesh);
+
+      return g;
+    }
+
+    const leftGlove = createBoxingGlove('left');
+    const rightGlove = createBoxingGlove('right');
+
+    const leftRestPos = new THREE.Vector3(-0.25, -0.16, -0.55);
+    const rightRestPos = new THREE.Vector3(0.25, -0.16, -0.55);
+
+    leftGlove.position.copy(leftRestPos);
+    rightGlove.position.copy(rightRestPos);
+
+    leftGlove.rotation.set(0.18, 0.22, -0.15);
+    rightGlove.rotation.set(0.18, -0.22, 0.15);
+
+    glovesGroup.add(leftGlove);
+    glovesGroup.add(rightGlove);
+
+    const punchAnim = {
+      active: false,
+      progress: 0,
+      duration: 0.22,
+      side: 'right',
+      hitDelivered: false
+    };
+
+    // --- 3D PARTICLE SPARKS SYSTEM ---
+    const sparkCount = 80;
+    const sparkGeo = new THREE.BufferGeometry();
+    const sparkPositions = new Float32Array(sparkCount * 3);
+    const sparkVelocities = [];
+    for (let i = 0; i < sparkCount; i++) {
+      sparkPositions[i * 3] = 0;
+      sparkPositions[i * 3 + 1] = -100;
+      sparkPositions[i * 3 + 2] = 0;
+      sparkVelocities.push(new THREE.Vector3());
+    }
+    sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
+    const sparkMat = new THREE.PointsMaterial({
+      color: 0xfbbf24,
+      size: 0.08,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending
+    });
+    const sparkParticles = new THREE.Points(sparkGeo, sparkMat);
+    scene.add(sparkParticles);
+
+    function spawnHitSparks(contactPos) {
+      for (let i = 0; i < sparkCount; i++) {
+        sparkPositions[i * 3] = contactPos.x + (Math.random() - 0.5) * 0.1;
+        sparkPositions[i * 3 + 1] = contactPos.y + (Math.random() - 0.5) * 0.1;
+        sparkPositions[i * 3 + 2] = contactPos.z + (Math.random() - 0.5) * 0.1;
+
+        sparkVelocities[i].set(
+          (Math.random() - 0.5) * 4.5,
+          Math.random() * 3.5 + 0.8,
+          Math.random() * 2.5 + 0.5
+        );
+      }
+      sparkGeo.attributes.position.needsUpdate = true;
+    }
+
+    // --- 3D MONSTER BASE & ELEMENTAL PBR SKINS ---
+    let mixer = null;
+    const actions = {};
+    let activeAction = null;
+    let monsterRoot = null;
+    let monsterMesh = null;
+    let monsterMaterial = null;
+    const baseFloorY = 0;
+    const baseZ = -1.85;
+
+    const gltfLoader = new GLTFLoader();
+    const texLoader = new THREE.TextureLoader();
+
+    function loadPbrTexture(url) {
+      const tex = texLoader.load(url);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.flipY = false;
+      return tex;
+    }
+
+    const SKINS = {
+      lava: {
+        id: 'lava',
+        name: 'Магма-Титан (PBR Лава)',
+        emoji: '🔥',
+        badge: 'СТИХИЯ ОГНЯ',
+        badgeCls: 'text-[10px] text-amber-400 bg-amber-950/80 border border-amber-800/80 px-2 py-0.5 rounded font-mono font-bold',
+        btnId: 'btn-skin-lava',
+        diffuse: loadPbrTexture('/assets/models/skin_lava_diff.jpg'),
+        emissive: loadPbrTexture('/assets/models/skin_lava_emis.jpg'),
+        emissiveColor: 0xff4400,
+        sparkColor: 0xff6600,
+        roughness: 0.65,
+        metalness: 0.2
+      },
+      toxic: {
+        id: 'toxic',
+        name: 'Кислотный Гоблин (PBR Яд)',
+        emoji: '🧪',
+        badge: 'СТИХИЯ ЯДА',
+        badgeCls: 'text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded font-mono font-bold',
+        btnId: 'btn-skin-toxic',
+        diffuse: loadPbrTexture('/assets/models/skin_toxic_diff.jpg'),
+        emissive: loadPbrTexture('/assets/models/skin_toxic_emis.jpg'),
+        emissiveColor: 0x22c55e,
+        sparkColor: 0x4ade80,
+        roughness: 0.75,
+        metalness: 0.1
+      },
+      frost: {
+        id: 'frost',
+        name: 'Ледяной Голем (PBR Мороз)',
+        emoji: '❄️',
+        badge: 'СТИХИЯ ЛЬДА',
+        badgeCls: 'text-[10px] text-cyan-400 bg-cyan-950/80 border border-cyan-800/80 px-2 py-0.5 rounded font-mono font-bold',
+        btnId: 'btn-skin-frost',
+        diffuse: loadPbrTexture('/assets/models/skin_frost_diff.jpg'),
+        emissive: loadPbrTexture('/assets/models/skin_frost_emis.jpg'),
+        emissiveColor: 0x38bdf8,
+        sparkColor: 0x38bdf8,
+        roughness: 0.45,
+        metalness: 0.35
+      },
+      original: {
+        id: 'original',
+        name: 'Каменный Страж (PBR База)',
+        emoji: '🗿',
+        badge: 'СТИХИЯ ЗЕМЛИ',
+        badgeCls: 'text-[10px] text-stone-300 bg-stone-900 border border-stone-700 px-2 py-0.5 rounded font-mono font-bold',
+        btnId: 'btn-skin-original',
+        diffuse: loadPbrTexture('/assets/models/monster_texture.jpg'),
+        emissive: null,
+        emissiveColor: 0x000000,
+        sparkColor: 0xfbbf24,
+        roughness: 0.85,
+        metalness: 0.05
+      }
+    };
+
+    let currentSkinKey = 'lava';
+
+    function showLoading(msg = 'ЗАГРУЗКА 3D МОДЕЛИ...') {
+      let overlay = document.getElementById('loading-overlay');
+      if (overlay) {
+        const msgEl = document.getElementById('loading-msg');
+        if (msgEl) msgEl.innerText = msg;
+        overlay.style.display = 'flex';
+        overlay.style.opacity = '1';
+        overlay.style.pointerEvents = 'auto';
+      }
+    }
+
+    function hideLoading() {
+      const overlay = document.getElementById('loading-overlay');
+      if (overlay) {
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+        setTimeout(() => {
+          overlay.style.display = 'none';
+        }, 320);
+      }
+    }
+
+    function applySkin(skinKey) {
+      const skin = SKINS[skinKey] || SKINS.lava;
+      currentSkinKey = skinKey;
+
+      const emojiEl = document.getElementById('boss-emoji');
+      const titleEl = document.getElementById('boss-title');
+      const badgeEl = document.getElementById('boss-badge');
+
+      if (emojiEl) emojiEl.innerText = skin.emoji;
+      if (titleEl) titleEl.innerText = skin.name;
+      if (badgeEl) {
+        badgeEl.innerText = skin.badge;
+        badgeEl.className = skin.badgeCls;
+      }
+
+      const activeBtnCls = 'px-3 py-1.5 text-xs font-bold rounded-lg transition bg-amber-500 text-gray-950 shadow';
+      const inactiveBtnCls = 'px-3 py-1.5 text-xs font-bold rounded-lg transition text-gray-400 hover:text-white';
+
+      for (const k in SKINS) {
+        const btn = document.getElementById(SKINS[k].btnId);
+        if (btn) {
+          btn.className = (k === skinKey) ? activeBtnCls : inactiveBtnCls;
+        }
+      }
+
+      sparkMat.color.setHex(skin.sparkColor);
+
+      if (monsterMesh && monsterMaterial) {
+        monsterMaterial.map = skin.diffuse;
+        monsterMaterial.emissiveMap = skin.emissive;
+        monsterMaterial.emissive.setHex(skin.emissiveColor);
+        monsterMaterial.roughness = skin.roughness;
+        monsterMaterial.metalness = skin.metalness;
+        monsterMaterial.emissiveIntensity = skin.emissive ? 1.0 : 0.0;
+        monsterMaterial.needsUpdate = true;
+      }
+    }
+
+    window.switchSkin = function(skinKey) {
+      applySkin(skinKey);
+    };
+
+    function initArenaMonster() {
+      showLoading('ЗАГРУЗКА БАЗОВОЙ 3D МОДЕЛИ И СКЕЛЕТА...');
+
+      gltfLoader.load(
+        '/assets/models/monster.glb',
+        (gltf) => {
+          monsterRoot = gltf.scene;
+
+          monsterRoot.scale.set(0.68, 0.68, 0.68);
+          monsterRoot.position.set(0, baseFloorY, baseZ);
+
+          monsterRoot.traverse((child) => {
+            if (child.isMesh) {
+              monsterMesh = child;
+              child.castShadow = true;
+              child.receiveShadow = true;
+
+              const activeSkin = SKINS[currentSkinKey];
+              monsterMaterial = new THREE.MeshStandardMaterial({
+                map: activeSkin.diffuse,
+                emissiveMap: activeSkin.emissive,
+                emissive: new THREE.Color(activeSkin.emissiveColor),
+                emissiveIntensity: activeSkin.emissive ? 1.0 : 0.0,
+                roughness: activeSkin.roughness,
+                metalness: activeSkin.metalness
+              });
+              child.material = monsterMaterial;
+            }
+          });
+
+          scene.add(monsterRoot);
+
+          mixer = new THREE.AnimationMixer(monsterRoot);
+          gltf.animations.forEach((clip) => {
+            const act = mixer.clipAction(clip);
+            actions[clip.name] = act;
+            if (clip.name === 'HitReact') {
+              act.setLoop(THREE.LoopOnce);
+              act.clampWhenFinished = false;
+            }
+            if (clip.name === 'Death') {
+              act.setLoop(THREE.LoopOnce);
+              act.clampWhenFinished = true;
+            }
+          });
+
+          // Native event: when HitReact finishes naturally, smoothly return to Idle
+          mixer.addEventListener('finished', (e) => {
+            if (e.action === actions['HitReact'] && !isDead) {
+              if (actions['Idle']) {
+                actions['HitReact'].fadeOut(0.1);
+                actions['Idle'].reset().fadeIn(0.1).play();
+                activeAction = actions['Idle'];
+              }
+            }
+          });
+
+          if (actions['Idle']) {
+            actions['Idle'].play();
+            activeAction = actions['Idle'];
+          }
+
+          applySkin(currentSkinKey);
+          updateHpUi();
+          hideLoading();
+        },
+        (xhr) => {
+          if (xhr.total > 0) {
+            const pct = Math.round((xhr.loaded / xhr.total) * 100);
+            const pEl = document.getElementById('loading-progress');
+            if (pEl) pEl.innerText = `${pct}%`;
+          }
+        },
+        (err) => {
+          console.error('GLTF Load Error:', err);
+          const pEl = document.getElementById('loading-progress');
+          if (pEl) pEl.innerText = 'Ошибка загрузки monster.glb';
+        }
+      );
+    }
+
+    function playAction(name, duration = 0.12) {
+      if (!actions[name]) return;
+      const targetAction = actions[name];
+
+      if (activeAction && activeAction !== targetAction) {
+        targetAction.reset();
+        activeAction.crossFadeTo(targetAction, duration, true);
+        targetAction.play();
+      } else {
+        targetAction.reset().play();
+      }
+      activeAction = targetAction;
+    }
+
+    // --- PUNCH MECHANICS (Phygital Fitness Deliverable) ---
+    window.triggerPunch = function(forceSide = null) {
+      if (isDead || punchAnim.active) return;
+
+      lastPunchSide = forceSide || (lastPunchSide === 'right' ? 'left' : 'right');
+      punchAnim.active = true;
+      punchAnim.progress = 0;
+      punchAnim.side = lastPunchSide;
+      punchAnim.duration = 0.22;
+      punchAnim.hitDelivered = false;
+    };
+
+    function onPunchImpact() {
+      if (isDead) return;
+
+      const isCrit = (combo % 4 === 3) || Math.random() < 0.25;
+      const baseDmg = 14;
+      const dmg = isCrit
+        ? Math.floor(baseDmg * 1.8 + Math.random() * 4)
+        : Math.floor(baseDmg * (0.9 + Math.random() * 0.3));
+
+      hp = Math.max(0, hp - dmg);
+      combo++;
+      reps++;
+
+      const repEl = document.getElementById('reps-counter');
+      if (repEl) repEl.innerText = reps;
+
+      updateHpUi();
+      spawnDamagePopup(dmg, isCrit);
+      playImpactSound(isCrit);
+
+      // Whiteout impact flash
+      const flash = document.getElementById('hit-flash');
+      if (flash) {
+        flash.style.opacity = isCrit ? '0.45' : '0.22';
+        setTimeout(() => flash.style.opacity = '0', 60);
+      }
+
+      // Camera recoil shake
+      trauma = isCrit ? 0.42 : 0.22;
+
+      // Body recoil
+      hitRecoil = isCrit ? 0.50 : 0.32;
+
+      // Contact point in 3D
+      const contact = new THREE.Vector3(
+        (lastPunchSide === 'right' ? 0.12 : -0.12),
+        1.45,
+        monsterRoot ? monsterRoot.position.z + 0.35 : -1.5
+      );
+      spawnHitSparks(contact);
+
+      if (hp <= 0) {
+        handleKnockout();
+      } else {
+        if (actions['HitReact'] && actions['Idle']) {
+          actions['Idle'].fadeOut(0.06);
+          actions['HitReact'].reset().fadeIn(0.06).play();
+          activeAction = actions['HitReact'];
+        }
+      }
+    }
+
+    function handleKnockout() {
+      isDead = true;
+      trauma = 0.65;
+
+      playKoSound();
+
+      if (actions['Death']) {
+        if (actions['HitReact']) actions['HitReact'].fadeOut(0.12);
+        if (actions['Idle']) actions['Idle'].fadeOut(0.12);
+        actions['Death'].reset().fadeIn(0.12).play();
+        activeAction = actions['Death'];
+      }
+
+      // Extinguish glowing veins upon defeat
+      if (monsterMaterial) {
+        monsterMaterial.emissiveIntensity = 0.15;
+      }
+
+      const repsDisplay = document.getElementById('ko-reps-display');
+      if (repsDisplay) repsDisplay.innerText = `${reps} УДАРОВ 💪`;
+
+      setTimeout(() => {
+        const koBanner = document.getElementById('ko-banner');
+        if (koBanner) koBanner.style.opacity = '1';
+      }, 700);
+    }
+
+    window.resetFight = function() {
+      hp = maxHp;
+      combo = 0;
+      reps = 0;
+      isDead = false;
+      hitRecoil = 0;
+      trauma = 0;
+      punchAnim.active = false;
+
+      const koBanner = document.getElementById('ko-banner');
+      if (koBanner) koBanner.style.opacity = '0';
+
+      const repEl = document.getElementById('reps-counter');
+      if (repEl) repEl.innerText = '0';
+
+      document.getElementById('combo-text').innerText = 'x0';
+
+      if (monsterRoot) {
+        monsterRoot.rotation.set(0, 0, 0);
+        monsterRoot.position.set(0, baseFloorY, baseZ);
+        monsterRoot.scale.set(0.68, 0.68, 0.68);
+      }
+
+      if (actions['Idle']) {
+        for (const k in actions) {
+          if (actions[k] !== actions['Idle']) actions[k].stop();
+        }
+        actions['Idle'].reset().play();
+        activeAction = actions['Idle'];
+      }
+
+      updateHpUi();
+    };
+
+    function spawnDamagePopup(dmg, isCrit) {
+      const container = document.getElementById('damage-container');
+      if (!container) return;
+      const el = document.createElement('div');
+      el.className = 'damage-float absolute left-1/2 top-1/2 font-black font-mono text-2xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]';
+      if (isCrit) {
+        el.className += ' text-amber-400 text-3xl';
+        el.innerHTML = `-${dmg} <span class="text-xs text-rose-500 bg-rose-950 px-1 py-0.5 rounded border border-rose-800">КРИТ! 🔥</span>`;
+      } else {
+        el.className += ' text-rose-400';
+        el.innerText = `-${dmg}`;
+      }
+      container.appendChild(el);
+      setTimeout(() => el.remove(), 850);
+    }
+
+    function updateHpUi() {
+      const pct = Math.max(0, (hp / maxHp) * 100);
+      const hpMain = document.getElementById('hp-main-bar');
+      const hpGhost = document.getElementById('hp-ghost-bar');
+      const hpText = document.getElementById('hp-text');
+      const comboText = document.getElementById('combo-text');
+      const phaseBadge = document.getElementById('boss-phase-badge');
+
+      if (hpMain) hpMain.style.width = pct + '%';
+      if (hpGhost) {
+        setTimeout(() => {
+          hpGhost.style.width = pct + '%';
+        }, 160);
+      }
+      if (hpText) hpText.innerText = `${hp} / ${maxHp} HP`;
+      if (comboText) comboText.innerText = `x${combo}`;
+
+      // VISUAL_STANDARD Emotional Phases
+      const ratio = hp / maxHp;
+      if (ratio > 0.6) {
+        bossPhase = 'confidence';
+        if (phaseBadge) {
+          phaseBadge.innerText = 'ФАЗА: УВЕРЕННОСТЬ 😤';
+          phaseBadge.className = 'text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2.5 py-0.5 rounded font-bold font-mono';
+        }
+      } else if (ratio > 0.4) {
+        bossPhase = 'tension';
+        if (phaseBadge) {
+          phaseBadge.innerText = 'ФАЗА: НАПРЯЖЕНИЕ 😠';
+          phaseBadge.className = 'text-[10px] text-amber-400 bg-amber-950/80 border border-amber-800/80 px-2.5 py-0.5 rounded font-bold font-mono';
+        }
+      } else {
+        bossPhase = 'panic';
+        if (phaseBadge) {
+          phaseBadge.innerText = 'ФАЗА: ПАНИКА 😰';
+          phaseBadge.className = 'text-[10px] text-rose-400 bg-rose-950/80 border border-rose-800/80 px-2.5 py-0.5 rounded font-bold font-mono animate-pulse';
+        }
+      }
+    }
+
+    // --- KEYBOARD CONTROLS ---
+    window.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        window.triggerPunch('left');
+      } else if (e.code === 'Enter') {
+        e.preventDefault();
+        window.triggerPunch('right');
+      } else if (e.code === 'KeyR') {
+        e.preventDefault();
+        window.resetFight();
+      }
+    });
+
+    // Window resize
+    window.addEventListener('resize', () => {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    });
+
+    initArenaMonster();
+
+    // --- MAIN RENDER & ANIMATION LOOP ---
+    const clock = new THREE.Clock();
+    let fpsFrames = 0;
+    let fpsLastTime = performance.now();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const dt = clock.getDelta();
+      const time = clock.getElapsedTime();
+
+      // FPS tracking
+      fpsFrames++;
+      if (performance.now() - fpsLastTime >= 1000) {
+        const fpsEl = document.getElementById('fps-counter');
+        if (fpsEl) fpsEl.innerText = `${fpsFrames} FPS`;
+        fpsFrames = 0;
+        fpsLastTime = performance.now();
+      }
+
+      // 1. Update Skeletal Animation Mixer
+      if (mixer) {
+        mixer.update(dt);
+      }
+
+      // 2. Monster Root Anchor (Pure Skeletal Animation)
+      if (monsterRoot && !isDead) {
+        monsterRoot.position.set(0, baseFloorY, baseZ);
+        monsterRoot.scale.set(0.68, 0.68, 0.68);
+        monsterRoot.rotation.set(0, 0, 0);
+      }
+
+      // 3. Emissive Glow Pulsing & Panic Veins
+      if (monsterMaterial && currentSkinKey !== 'original' && !isDead) {
+        if (bossPhase === 'panic') {
+          // Unstable erratic flickering veins
+          monsterMaterial.emissiveIntensity = 1.2 + Math.sin(time * 16.0) * 0.6 + (Math.random() - 0.5) * 0.4;
+        } else {
+          // Confident heavy breathing pulse
+          monsterMaterial.emissiveIntensity = 1.0 + Math.sin(time * 3.8) * 0.35;
+        }
+      }
+
+      // 4. Torch light flickers
+      torchLeft.intensity = 4.2 + Math.sin(time * 12) * 0.4 + Math.cos(time * 23) * 0.25;
+      torchRight.intensity = 4.2 + Math.sin(time * 15 + 1) * 0.4 + Math.cos(time * 19) * 0.25;
+
+      // 6. First-Person Gloves Guard Sway & Punch Motion
+      const activeGlove = punchAnim.side === 'right' ? rightGlove : leftGlove;
+      const restPos = punchAnim.side === 'right' ? rightRestPos : leftRestPos;
+
+      const idleBreatheY = Math.sin(time * 3.5) * 0.015;
+      const idleBreatheX = Math.cos(time * 1.8) * 0.008;
+
+      if (!punchAnim.active) {
+        leftGlove.position.x = leftRestPos.x + idleBreatheX;
+        leftGlove.position.y = leftRestPos.y + idleBreatheY;
+        leftGlove.position.z = leftRestPos.z;
+
+        rightGlove.position.x = rightRestPos.x - idleBreatheX;
+        rightGlove.position.y = rightRestPos.y + idleBreatheY;
+        rightGlove.position.z = rightRestPos.z;
+
+        leftGlove.rotation.set(0.18, 0.22, -0.15);
+        rightGlove.rotation.set(0.18, -0.22, 0.15);
+      } else {
+        punchAnim.progress += dt / punchAnim.duration;
+        const p = Math.min(1.0, punchAnim.progress);
+
+        let fwd;
+        if (p < 0.45) {
+          fwd = Math.sin((p / 0.45) * (Math.PI / 2));
+        } else {
+          fwd = Math.cos(((p - 0.45) / 0.55) * (Math.PI / 2));
+        }
+
+        const targetZ = -1.45;
+        const targetX = punchAnim.side === 'right' ? 0.08 : -0.08;
+        const targetY = 0.02;
+
+        activeGlove.position.z = THREE.MathUtils.lerp(restPos.z, targetZ, fwd);
+        activeGlove.position.x = THREE.MathUtils.lerp(restPos.x, targetX, fwd);
+        activeGlove.position.y = THREE.MathUtils.lerp(restPos.y, targetY, fwd);
+
+        activeGlove.rotation.z = (punchAnim.side === 'right' ? 0.15 : -0.15) + (punchAnim.side === 'right' ? -0.4 : 0.4) * fwd;
+
+        if (p >= 0.42 && !punchAnim.hitDelivered) {
+          punchAnim.hitDelivered = true;
+          onPunchImpact();
+        }
+
+        if (punchAnim.progress >= 1.0) {
+          punchAnim.active = false;
+          activeGlove.position.copy(restPos);
+          activeGlove.rotation.set(0.18, punchAnim.side === 'right' ? -0.22 : 0.22, punchAnim.side === 'right' ? 0.15 : -0.15);
+        }
+      }
+
+      // 7. Update Sparks
+      for (let i = 0; i < sparkCount; i++) {
+        if (sparkPositions[i * 3 + 1] > -50) {
+          sparkPositions[i * 3] += sparkVelocities[i].x * dt;
+          sparkPositions[i * 3 + 1] += sparkVelocities[i].y * dt;
+          sparkPositions[i * 3 + 2] += sparkVelocities[i].z * dt;
+          sparkVelocities[i].y -= 9.8 * dt;
+          if (sparkPositions[i * 3 + 1] < 0.05) {
+            sparkPositions[i * 3 + 1] = -100;
+          }
+        }
+      }
+      sparkGeo.attributes.position.needsUpdate = true;
+
+      // 8. Camera Position & Screen Trauma Shake
+      let shakeX = 0, shakeY = 0;
+      if (trauma > 0) {
+        shakeX = (Math.random() - 0.5) * trauma * 0.14;
+        shakeY = (Math.random() - 0.5) * trauma * 0.14;
+        trauma = Math.max(0, trauma - dt * 1.8);
+      }
+
+      camera.position.x = shakeX;
+      camera.position.y = 1.4 + shakeY;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Antigravity AI Studio Bridge",
+  "version": "1.0",
+  "description": "Автономный мост между Google AI Studio (Nano Banana PRO) и Antigravity Studio",
+  "permissions": [],
+  "host_permissions": [
+    "https://aistudio.google.com/*",
+    "http://127.0.0.1:48123/*",
+    "http://localhost:48123/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://aistudio.google.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

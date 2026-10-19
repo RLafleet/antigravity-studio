@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>VRM Combat Preview: Lilith</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2.1.3/lib/three-vrm.module.min.js"
+    }
+  }
+  </script>
+</head>
+<body class="bg-gray-950 text-white min-h-screen flex flex-col items-center justify-center p-3 select-none font-sans">
+  <div class="w-full max-w-4xl bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden p-4 shadow-2xl flex flex-col gap-3">
+    
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🔥</span>
+        <div>
+          <h1 class="text-base font-black tracking-wider text-amber-400">БОСС LILITH (VRoid 3D)</h1>
+          <p class="text-xs text-gray-400">Скелет VRM 1.0 &bull; SpringBone Physics &bull; Боевые анимации</p>
+        </div>
+      </div>
+      <div id="status" class="text-xs font-mono bg-gray-800 px-3 py-1.5 rounded-lg text-emerald-400 border border-gray-700">Загрузка...</div>
+    </div>
+
+    <!-- 3D Canvas Box -->
+    <div id="canvas-container" class="w-full h-[500px] bg-black rounded-xl overflow-hidden relative shadow-inner cursor-pointer" onclick="playAnim('HitReact')">
+      <!-- Hit Overlay -->
+      <div id="hit-flash" class="absolute inset-0 bg-white pointer-events-none opacity-0 transition-opacity duration-75 z-20"></div>
+    </div>
+
+    <!-- Control Buttons -->
+    <div class="flex items-center gap-2">
+      <button onclick="playAnim('Idle')" class="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs rounded-xl border border-gray-700 transition active:scale-95">
+        🧍 Стойка (Idle)
+      </button>
+      <button onclick="playAnim('HitReact')" class="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-rose-600/30 transition active:scale-95">
+        🥊 Получение урона (HitReact)
+      </button>
+      <button onclick="playAnim('AttackHook')" class="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-amber-600/30 transition active:scale-95">
+        ⚡ Удар хук (AttackHook)
+      </button>
+      <button onclick="playAnim('Death')" class="flex-1 py-2.5 bg-red-950 hover:bg-red-900 text-red-200 font-bold text-xs rounded-xl border border-red-800 transition active:scale-95">
+        💀 Смерть / Нокаут
+      </button>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+    import { mixamoVRMRigMap } from './mixamoVRMRigMap.js';
+
+    const container = document.getElementById('canvas-container');
+    const width = container.clientWidth || 800;
+    const height = container.clientHeight || 500;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0e17);
+
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 50);
+    camera.position.set(0, 1.25, 2.5);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    container.appendChild(renderer.domElement);
+
+    // Dungeon lighting
+    const ambLight = new THREE.AmbientLight(0xffffff, 1.0);
+    scene.add(ambLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffedd5, 1.8);
+    dirLight.position.set(1.5, 3.5, 2.0);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
+
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, 1.0);
+    rimLight.position.set(-2, 2, -2);
+    scene.add(rimLight);
+
+    // Stone floor
+    const floorGeo = new THREE.PlaneGeometry(10, 10);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.85 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    const grid = new THREE.GridHelper(10, 10, 0xf59e0b, 0x1f2937);
+    scene.add(grid);
+
+    const statusEl = document.getElementById('status');
+
+    let currentVrm = null;
+    let mixer = null;
+    const vrmActions = {};
+    let activeAction = null;
+
+    // Retarget Mixamo animation clip to VRM
+    function retargetMixamoClip(clip, vrm, sourceAsset) {
+      const tracks = [];
+      const restRotationInverse = new THREE.Quaternion();
+      const parentRestWorldRotation = new THREE.Quaternion();
+      const _quatA = new THREE.Quaternion();
+
+      const sourceHips = sourceAsset.getObjectByName('mixamorigHips') || sourceAsset.getObjectByName('mixamorig:Hips');
+      const motionHipsHeight = sourceHips ? sourceHips.position.y : 1.0;
+      const vrmHips = vrm.humanoid?.getNormalizedBoneNode('hips');
+      const vrmHipsHeight = vrmHips ? vrmHips.position.y : 0.9;
+      const hipsScale = (motionHipsHeight > 0.001) ? (vrmHipsHeight / motionHipsHeight) : 1.0;
+
+      clip.tracks.forEach((track) => {
+        const splitted = track.name.split('.');
+        let rawRigName = splitted[0].replace(':', '');
+        const prop = splitted[1];
+
+        const vrmBoneName = mixamoVRMRigMap[rawRigName] || mixamoVRMRigMap[splitted[0]];
+        const vrmNode = vrm.humanoid?.getNormalizedBoneNode(vrmBoneName);
+
+        if (vrmNode) {
+          const mixamoNode = sourceAsset.getObjectByName(splitted[0]) || sourceAsset.getObjectByName(rawRigName);
+
+          if (track instanceof THREE.QuaternionKeyframeTrack) {
+            if (mixamoNode) {
+              mixamoNode.getWorldQuaternion(restRotationInverse).invert();
+              if (mixamoNode.parent) {
+                mixamoNode.parent.getWorldQuaternion(parentRestWorldRotation);
+              } else {
+                parentRestWorldRotation.identity();
+              }
+            } else {
+              restRotationInverse.identity();
+              parentRestWorldRotation.identity();
+            }
+
+            const clonedValues = track.values.slice();
+            for (let i = 0; i < clonedValues.length; i += 4) {
+              _quatA.fromArray(clonedValues, i);
+              _quatA.premultiply(parentRestWorldRotation).multiply(restRotationInverse);
+              _quatA.toArray(clonedValues, i);
+            }
+
+            tracks.push(
+              new THREE.QuaternionKeyframeTrack(
+                `${vrmNode.name}.${prop}`,
+                track.times,
+                clonedValues
+              )
+            );
+          } else if (track instanceof THREE.VectorKeyframeTrack) {
+            const scaledValues = track.values.map((v, i) => (i % 3 === 1 ? v * hipsScale : v));
+            tracks.push(
+              new THREE.VectorKeyframeTrack(
+                `${vrmNode.name}.${prop}`,
+                track.times,
+                scaledValues
+              )
+            );
+          }
+        }
+      });
+
+      return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+    }
+
+    const loader = new GLTFLoader();
+    loader.register((parser) => new VRMLoaderPlugin(parser));
+
+    statusEl.innerText = '1/2 Загрузка VRM модели...';
+
+    loader.load(
+      '/assets/models/test.vrm',
+      (gltfVRM) => {
+        const vrm = gltfVRM.userData.vrm;
+        currentVrm = vrm;
+
+        vrm.scene.traverse((obj) => {
+          obj.frustumCulled = false;
+          if (obj.isMesh) {
+            obj.castShadow = true;
+            obj.receiveShadow = true;
+          }
+        });
+
+        scene.add(vrm.scene);
+        vrm.scene.position.set(0, 0, 0);
+
+        statusEl.innerText = '2/2 Загрузка боевых анимаций...';
+
+        // Load monster.glb for combat animations
+        const animLoader = new GLTFLoader();
+        animLoader.load(
+          '/assets/models/monster.glb',
+          (gltfAnim) => {
+            mixer = new THREE.AnimationMixer(vrm.scene);
+
+            gltfAnim.animations.forEach((clip) => {
+              const vrmClip = retargetMixamoClip(clip, vrm, gltfAnim.scene);
+              const act = mixer.clipAction(vrmClip);
+              vrmActions[clip.name] = act;
+
+              if (clip.name === 'HitReact') {
+                act.setLoop(THREE.LoopOnce);
+                act.clampWhenFinished = false;
+              }
+              if (clip.name === 'Death') {
+                act.setLoop(THREE.LoopOnce);
+                act.clampWhenFinished = true;
+              }
+            });
+
+            // Smooth return to Idle
+            mixer.addEventListener('finished', (e) => {
+              if (e.action === vrmActions['HitReact']) {
+                if (vrmActions['Idle']) {
+                  vrmActions['HitReact'].fadeOut(0.12);
+                  vrmActions['Idle'].reset().fadeIn(0.12).play();
+                  activeAction = vrmActions['Idle'];
+                }
+              }
+            });
+
+            if (vrmActions['Idle']) {
+              vrmActions['Idle'].play();
+              activeAction = vrmActions['Idle'];
+            }
+
+            statusEl.innerText = 'БОЕВОЙ ДВИЖОК ГОТОВ!';
+            console.log('VRM and Animations ready:', vrmActions);
+            window._vrmCombatReady = true;
+          },
+          null,
+          (err) => {
+            console.error('Error loading animations:', err);
+            statusEl.innerText = 'Ошибка анимаций: ' + err.message;
+          }
+        );
+      },
+      null,
+      (err) => {
+        console.error('Error loading VRM:', err);
+        statusEl.innerText = 'Ошибка VRM: ' + err.message;
+      }
+    );
+
+    window.playAnim = function(name) {
+      if (!vrmActions[name]) return;
+      const target = vrmActions[name];
+
+      if (name === 'HitReact') {
+        const flash = document.getElementById('hit-flash');
+        if (flash) {
+          flash.style.opacity = '0.7';
+          setTimeout(() => flash.style.opacity = '0', 70);
+        }
+      }
+
+      if (activeAction && activeAction !== target) {
+        target.reset();
+        activeAction.crossFadeTo(target, 0.1, true);
+        target.play();
+      } else {
+        target.reset().play();
+      }
+      activeAction = target;
+    };
+
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = clock.getDelta();
+
+      if (currentVrm) {
+        currentVrm.update(dt);
+      }
+      if (mixer) {
+        mixer.update(dt);
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>

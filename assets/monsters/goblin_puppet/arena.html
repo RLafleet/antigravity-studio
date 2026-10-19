@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <base href="/assets/monsters/goblin_puppet/">
+  <title>IronStrike Arena: Dungeon Combat Engine</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: #03050a;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      user-select: none;
+      overflow-x: hidden;
+    }
+    @keyframes floatUp {
+      0% { transform: translateY(0px) scale(0.85); opacity: 0; }
+      18% { opacity: 1; transform: scale(1.3); }
+      100% { transform: translateY(-85px) scale(1.0); opacity: 0; }
+    }
+    @keyframes comboPop {
+      0% { transform: scale(0.4); opacity: 0; }
+      50% { transform: scale(1.35); opacity: 1; }
+      100% { transform: scale(1.0); opacity: 1; }
+    }
+    .animate-combo {
+      animation: comboPop 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-2 sm:p-5">
+
+  <div class="max-w-2xl w-full bg-gray-950/95 border border-indigo-900/50 rounded-3xl p-5 sm:p-6 shadow-[0_25px_80px_rgba(0,0,0,0.9)] flex flex-col gap-4 backdrop-blur-2xl relative overflow-hidden">
+    
+    <!-- Top Ambient Fire & Blue Atmosphere -->
+    <div class="absolute -top-24 left-1/4 w-80 h-36 bg-amber-600/15 blur-[80px] pointer-events-none"></div>
+    <div class="absolute -top-24 right-1/4 w-80 h-36 bg-indigo-600/20 blur-[80px] pointer-events-none"></div>
+
+    <!-- Header & Info -->
+    <div class="flex items-center justify-between border-b border-gray-800/80 pb-3">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-900/80 via-red-950 to-indigo-950 border border-amber-600/40 flex items-center justify-center text-2xl shadow-inner shadow-amber-500/20">
+          🥊
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-sm sm:text-base font-black text-white tracking-wide uppercase">IronStrike: Арена Босса</h1>
+            <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-400 border border-amber-700/60 font-bold uppercase tracking-wider">DUNGEON BATTLE</span>
+          </div>
+          <p class="text-[11px] text-gray-400">1 отжимание на камеру = 1 сокрушительный удар кулаком по боссу</p>
+        </div>
+      </div>
+      <div class="text-right flex flex-col items-end gap-0.5">
+        <div class="text-xs font-mono font-bold text-amber-400" id="fps-display">60 FPS</div>
+        <div class="text-[10px] text-amber-300 font-mono font-bold" id="combo-display">COMBO: x0</div>
+      </div>
+    </div>
+
+    <!-- Dual-Layer HP Bar (Street Fighter Style) -->
+    <div class="flex flex-col gap-1.5 bg-gray-900/90 p-3.5 rounded-2xl border border-gray-800/90 shadow-inner">
+      <div class="flex justify-between items-center text-xs font-semibold">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">👹</span>
+          <span class="text-white font-extrabold tracking-tight">Гоблин-Берсерк</span>
+          <span class="text-[10px] text-rose-400 bg-rose-950/80 border border-rose-800/80 px-2 py-0.2 rounded font-mono font-bold">БОСС РАУНД 1</span>
+        </div>
+        <span id="hp-text" class="font-mono text-gray-200 text-xs font-bold">120 / 120 HP</span>
+      </div>
+      <!-- Progress Bar Container -->
+      <div class="w-full bg-gray-950 h-5 rounded-full overflow-hidden border border-gray-800 relative shadow-inner p-0.5">
+        <!-- Ghost / Trail Bar (Slow decay) -->
+        <div id="hp-ghost-bar" class="absolute left-0.5 top-0.5 bottom-0.5 bg-amber-400 transition-all duration-500 ease-out rounded-full" style="width: calc(100% - 4px);"></div>
+        <!-- Main Fast HP Bar -->
+        <div id="hp-main-bar" class="absolute left-0.5 top-0.5 bottom-0.5 bg-gradient-to-r from-rose-600 via-red-500 to-amber-500 transition-all duration-100 rounded-full shadow-[0_0_15px_rgba(244,63,94,0.7)]" style="width: calc(100% - 4px);"></div>
+      </div>
+    </div>
+
+    <!-- Arena Stage Canvas Box -->
+    <div class="relative w-full h-[450px] bg-[#060810] border border-gray-800 rounded-2xl overflow-hidden shadow-[inset_0_4px_50px_rgba(0,0,0,0.95)] cursor-pointer group" onclick="triggerHit()">
+      
+      <!-- Hit Stop Whiteout Flash -->
+      <div id="flash-overlay" class="absolute inset-0 bg-white pointer-events-none opacity-0 z-30 transition-opacity duration-75"></div>
+
+      <!-- Combo Counter Banner -->
+      <div id="combo-banner" class="absolute top-4 left-4 z-20 pointer-events-none hidden">
+        <div class="text-3xl font-black italic tracking-tighter text-amber-400 drop-shadow-[0_4px_16px_rgba(251,191,36,0.9)] animate-combo" id="combo-text">
+          3x COMBO! 🔥
+        </div>
+      </div>
+
+      <!-- Pushup Status Live Indicator -->
+      <div id="cam-status-pill" class="absolute top-4 right-4 z-20 pointer-events-none hidden">
+        <div class="px-3 py-1 rounded-full bg-gray-900/90 border border-gray-700 text-xs font-mono font-bold flex items-center gap-2 shadow-lg backdrop-blur">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" id="cam-dot"></span>
+          <span id="cam-status-text" class="text-emerald-300">КАМЕРА: ГОТОВА</span>
+        </div>
+      </div>
+
+      <!-- Damage Popups Container -->
+      <div id="damage-container" class="absolute inset-0 pointer-events-none z-20 overflow-hidden"></div>
+
+      <!-- Floating Arcade KO Banner (Compact & Crisp) -->
+      <div id="ko-banner" class="absolute top-3.5 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none opacity-0 transition-all duration-500 z-40 bg-gray-950/90 border border-amber-500/60 px-6 py-2.5 rounded-2xl backdrop-blur-md shadow-[0_10px_35px_rgba(0,0,0,0.9)] max-w-xs sm:max-w-sm w-[88%] text-center">
+        <div class="flex items-center gap-2 text-2xl sm:text-3xl font-black text-amber-400 tracking-wider drop-shadow-[0_2px_12px_rgba(251,191,36,0.8)]">
+          <span>🏆</span>
+          <span class="bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-400 bg-clip-text text-transparent">НОКАУТ!</span>
+          <span>🏆</span>
+        </div>
+        <div class="mt-1 flex items-center justify-center gap-2.5 text-[11px] font-mono">
+          <span class="text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800 font-bold">+150 XP ⚡</span>
+          <span class="text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800 font-bold">+50 Золота 🪙</span>
+        </div>
+        <button onclick="event.stopPropagation(); resetGame();" class="mt-2.5 px-5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 font-black text-xs pointer-events-auto shadow-md shadow-amber-500/30 transition active:scale-95 flex items-center gap-1.5 mx-auto">
+          <span>🔄</span> <span>Следующий бой</span>
+        </button>
+      </div>
+
+      <!-- Main Canvas -->
+      <canvas id="puppet-canvas" width="640" height="450" class="w-full h-full block"></canvas>
+      
+      <div class="absolute bottom-2.5 right-3 text-[10px] font-mono text-gray-400/80 pointer-events-none">
+        ПРОБЕЛ / Клик = Удар &bull; Камера = Авто-удар при отжимании
+      </div>
+    </div>
+
+    <!-- Controls Row -->
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+      <button onclick="triggerHit()" id="btn-hit" class="sm:col-span-2 py-3.5 px-5 rounded-2xl bg-gradient-to-r from-rose-600 via-red-500 to-rose-600 hover:brightness-110 text-white font-black text-sm tracking-wide shadow-xl shadow-rose-600/30 active:scale-95 transition flex items-center justify-center gap-2 border border-rose-400/30">
+        <span class="text-xl">🥊</span> ОТЖИМАНИЕ (УДАР)
+      </button>
+      <button onclick="toggleWebcam()" id="btn-camera" class="py-3.5 px-3 rounded-2xl bg-indigo-900/60 hover:bg-indigo-800/80 text-indigo-200 font-bold text-xs border border-indigo-700/60 transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20 active:scale-95">
+        <span id="cam-icon">📹</span> <span id="cam-btn-label">Включить камеру</span>
+      </button>
+      <button onclick="resetGame()" class="py-3.5 px-3 rounded-2xl bg-gray-900 hover:bg-gray-800 text-gray-300 font-bold text-xs border border-gray-800 transition flex items-center justify-center gap-1.5 active:scale-95">
+        <span>🔄</span> Сброс HP
+      </button>
+    </div>
+
+    <!-- Collapsible Webcam Push-up PiP Box -->
+    <div id="cam-pip-container" class="hidden flex items-center gap-4 bg-gray-900/80 border border-gray-800 rounded-2xl p-3 text-xs">
+      <div class="relative w-36 h-24 bg-black rounded-xl overflow-hidden border border-gray-700 shrink-0">
+        <video id="webcam-video" autoplay playsinline muted class="w-full h-full object-cover -scale-x-100"></video>
+        <canvas id="motion-canvas" width="80" height="60" class="hidden"></canvas>
+        <div id="depth-bar" class="absolute bottom-0 left-0 h-1.5 bg-emerald-500 transition-all duration-75" style="width: 0%;"></div>
+      </div>
+      <div class="flex flex-col gap-1 flex-1">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-white">Трекер отжиманий (Optical Flow)</span>
+          <span id="rep-counter" class="font-mono text-emerald-400 font-bold bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">0 REPS</span>
+        </div>
+        <p class="text-[11px] text-gray-400">Опускайтесь вниз до конца и выжимайте вверх — удар сработает на подъеме!</p>
+        <div class="flex items-center gap-2 mt-0.5">
+          <span class="text-[10px] text-gray-500 font-mono">Глубина:</span>
+          <div class="flex-1 bg-gray-950 h-2 rounded-full overflow-hidden border border-gray-800">
+            <div id="rep-progress" class="bg-gradient-to-r from-indigo-500 to-emerald-400 h-full w-0 transition-all duration-75"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    window.onerror = function(msg, url, line, col, error) {
+      console.error("PAGE ERROR:", msg, line, col, error);
+    };
+
+    // --- JUICY AUDIO SYNTH (Web Audio API Punch & Whoosh FX) ---
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function playPunchSound(isCrit = false) {
+      try {
+        if (!audioCtx) audioCtx = new AudioCtx();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        const t = audioCtx.currentTime;
+
+        // Layer 1: Sub-Bass Boom (Chest Thump)
+        const bassOsc = audioCtx.createOscillator();
+        const bassGain = audioCtx.createGain();
+        bassOsc.type = 'sine';
+        bassOsc.frequency.setValueAtTime(isCrit ? 160 : 135, t);
+        bassOsc.frequency.exponentialRampToValueAtTime(20, t + 0.25);
+        bassGain.gain.setValueAtTime(isCrit ? 0.8 : 0.6, t);
+        bassGain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+        bassOsc.connect(bassGain);
+        bassGain.connect(audioCtx.destination);
+        bassOsc.start(t);
+        bassOsc.stop(t + 0.28);
+
+        // Layer 2: Crunchy Punch Slap (Filtered Noise)
+        const bufferSize = Math.floor(audioCtx.sampleRate * 0.09);
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.25));
+        }
+
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const noiseFilter = audioCtx.createBiquadFilter();
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.setValueAtTime(isCrit ? 3200 : 2000, t);
+
+        const noiseGain = audioCtx.createGain();
+        noiseGain.gain.setValueAtTime(isCrit ? 0.65 : 0.45, t);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(audioCtx.destination);
+        noise.start(t);
+      } catch (e) {}
+    }
+
+    // --- CANVAS & ARENA ENGINE ---
+    const canvas = document.getElementById('puppet-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Load HD Master Boss Sprite
+    const bossImg = new Image();
+    bossImg.src = 'goblin_boss.png';
+
+    // Optional Hurt Reaction Sprite
+    const bossHurtImg = new Image();
+    bossHurtImg.src = 'goblin_boss_hurt.png';
+
+    // Low HP Panic/Bruised Emotion Sprite (< 45 HP)
+    const bossPanicImg = new Image();
+    bossPanicImg.src = 'goblin_boss_panic.png';
+
+    // Knockout (K.O.) Defeated Boss Sprite
+    const bossKoImg = new Image();
+    bossKoImg.src = 'goblin_ko.png';
+
+    // Optional Background image (falls back to procedural dungeon)
+    const bgImg = new Image();
+    bgImg.src = 'arena_bg.png';
+
+    // First-Person Boxer Guard Gloves (Punch-Out Style)
+    const guardLeftImg = new Image();
+    guardLeftImg.src = 'guard_left.png';
+    const guardRightImg = new Image();
+    guardRightImg.src = 'guard_right.png';
+
+    // Combat State
+    let hp = 120;
+    const maxHp = 120;
+    let comboCount = 0;
+    let lastHitTime = 0;
+    let isDead = false;
+    let deathProgress = 0;
+
+    // Harmonic Spring Physics for Squash & Stretch
+    let squashScaleX = 1.0;
+    let squashScaleY = 1.0;
+    let squashVelX = 0;
+    let squashVelY = 0;
+
+    // Recoil, Tilt & Shake
+    let recoilX = 0;
+    let recoilRot = 0;
+    let trauma = 0; // screen shake intensity [0..1]
+    let hitFlashTimer = 0;
+    let hurtTimer = 0;
+
+    // First-Person Punch Animation State
+    const punchState = {
+      active: false,
+      progress: 0, // 0..1
+      duration: 0.24, // 240ms fast punch
+      side: 'right', // 'left' or 'right'
+      isCrit: false
+    };
+
+    // Clock
+    let time = 0;
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fpsTime = 0;
+
+    // Particle FX (Sparks, Embers, Rings, Torch Smoke)
+    const sparks = [];
+    const shockwaves = [];
+    const ambientEmbers = [];
+    for (let i = 0; i < 35; i++) {
+      ambientEmbers.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vy: -0.3 - Math.random() * 0.7,
+        vx: (Math.random() - 0.5) * 0.35,
+        size: 1.2 + Math.random() * 2.5,
+        color: Math.random() > 0.4 ? 'rgba(251, 191, 36,' : 'rgba(249, 115, 22,',
+        alpha: 0.2 + Math.random() * 0.6
+      });
+    }
+
+    // Dynamic Torch Warm Radial Glow Overlay
+    function drawTorchGlow(ctx, x, y, t, phase) {
+      const flicker = Math.sin(t * 14 + phase) * 0.08 + Math.cos(t * 26 + phase) * 0.05 + 1.0;
+      const radius = Math.max(0.1, 150 * flicker);
+      const glow = ctx.createRadialGradient(x, y, 5, x, y, radius);
+      glow.addColorStop(0, 'rgba(251, 146, 60, 0.28)');
+      glow.addColorStop(0.35, 'rgba(234, 88, 12, 0.12)');
+      glow.addColorStop(0.75, 'rgba(180, 83, 9, 0.03)');
+      glow.addColorStop(1, 'transparent');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // --- PROCEDURAL / PAINTED DUNGEON ARENA RENDERER ---
+    function drawDungeonArena(ctx, w, h, t) {
+      if (bgImg.complete && bgImg.naturalWidth > 0) {
+        // If an AI-generated painted arena background is available, render it
+        ctx.drawImage(bgImg, 0, 0, w, h);
+
+        // Dynamic warm lighting flicker over the painted wall torches
+        drawTorchGlow(ctx, w * 0.11, h * 0.40, t, 0);
+        drawTorchGlow(ctx, w * 0.89, h * 0.40, t, 2.5);
+
+        // Dramatic dark fantasy vignette
+        const vigGrad = ctx.createRadialGradient(w / 2, h / 2, h * 0.35, w / 2, h / 2, h * 0.88);
+        vigGrad.addColorStop(0, 'transparent');
+        vigGrad.addColorStop(0.65, 'rgba(3, 5, 10, 0.25)');
+        vigGrad.addColorStop(1, 'rgba(2, 3, 6, 0.85)');
+        ctx.fillStyle = vigGrad;
+        ctx.fillRect(0, 0, w, h);
+        return;
+      }
+
+      // 1. Stone Masonry Wall Background (Dark slate with mortar bricks)
+      const brickRows = 8;
+      const brickCols = 10;
+      const brickH = (h * 0.55) / brickRows;
+      const brickW = w / brickCols;
+
+      ctx.fillStyle = '#0a0d18';
+      ctx.fillRect(0, 0, w, h);
+
+      for (let r = 0; r < brickRows; r++) {
+        const y = r * brickH;
+        const xOffset = (r % 2 === 1) ? brickW * 0.5 : 0;
+        for (let c = -1; c <= brickCols; c++) {
+          const x = c * brickW + xOffset;
+          // Subtly varied brick slate colors
+          const seed = Math.sin(r * 12.9898 + c * 78.233);
+          const val = Math.floor(13 + seed * 5);
+          ctx.fillStyle = `rgb(${val}, ${val + 2}, ${val + 8})`;
+          ctx.fillRect(x + 1.5, y + 1.5, brickW - 3, brickH - 3);
+
+          // Subtle mortar border
+          ctx.strokeStyle = '#05070d';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x + 1.5, y + 1.5, brickW - 3, brickH - 3);
+        }
+      }
+
+      // 2. Iron Chains hanging on wall
+      drawChains(ctx, w * 0.18, 0, 110, t, 0);
+      drawChains(ctx, w * 0.82, 0, 110, t, 1.2);
+
+      // 3. Perspective Cobblestone Floor (3D depth)
+      const floorY = h * 0.52;
+      const floorH = h - floorY;
+
+      // Dark stone gradient base
+      const floorGrad = ctx.createLinearGradient(0, floorY, 0, h);
+      floorGrad.addColorStop(0, '#090d16');
+      floorGrad.addColorStop(0.3, '#101624');
+      floorGrad.addColorStop(1, '#05070c');
+      ctx.fillStyle = floorGrad;
+      ctx.fillRect(0, floorY, w, floorH);
+
+      // Perspective stone slabs
+      ctx.save();
+      const numFloorRows = 9;
+      for (let i = 0; i <= numFloorRows; i++) {
+        const rowProgress = Math.pow(i / numFloorRows, 1.8);
+        const y = floorY + rowProgress * floorH;
+        ctx.strokeStyle = 'rgba(30, 41, 59, 0.45)';
+        ctx.lineWidth = 1.5 + rowProgress * 2;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      // Receding perspective grid lines
+      const vanishingX = w / 2;
+      const vanishingY = floorY - 30;
+      const numLines = 14;
+      for (let i = -numLines; i <= numLines; i++) {
+        const bottomX = w / 2 + (i / numLines) * (w * 1.3);
+        ctx.strokeStyle = 'rgba(30, 41, 59, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(vanishingX + (i / numLines) * (w * 0.15), floorY);
+        ctx.lineTo(bottomX, h);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 4. Wall Torches with Dynamic Flickering Flame & Warm Illumination
+      drawTorch(ctx, 65, 125, t, 0);
+      drawTorch(ctx, w - 65, 125, t, 2.5);
+
+      // 5. Heavy Top Archway & Vignette (Dark theatrical framing)
+      const vigGrad = ctx.createRadialGradient(w / 2, h / 2, h * 0.35, w / 2, h / 2, h * 0.85);
+      vigGrad.addColorStop(0, 'transparent');
+      vigGrad.addColorStop(0.7, 'rgba(3, 5, 10, 0.45)');
+      vigGrad.addColorStop(1, 'rgba(2, 3, 6, 0.95)');
+      ctx.fillStyle = vigGrad;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    // Helper: Hanging Iron Chains
+    function drawChains(ctx, x, startY, length, t, offset) {
+      ctx.save();
+      const sway = Math.sin(t * 1.4 + offset) * 3;
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x, startY);
+      ctx.quadraticCurveTo(x + sway * 0.5, startY + length * 0.5, x + sway, startY + length);
+      ctx.stroke();
+
+      // Chain Links
+      for (let y = startY + 12; y < startY + length; y += 14) {
+        const linkSway = (y / length) * sway;
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(x + linkSway - 3, y - 4, 6, 8);
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + linkSway - 3, y - 4, 6, 8);
+      }
+      ctx.restore();
+    }
+
+    // Helper: Wall Torch with Dynamic Fire & Radial Lighting
+    function drawTorch(ctx, x, y, t, phase) {
+      const flicker = Math.sin(t * 14 + phase) * 0.08 + Math.cos(t * 26 + phase) * 0.05 + 1.0;
+
+      // Radial Warm Glow
+      const glow = ctx.createRadialGradient(x, y - 10, 5, x, y - 10, 160 * flicker);
+      glow.addColorStop(0, 'rgba(251, 146, 60, 0.28)');
+      glow.addColorStop(0.35, 'rgba(234, 88, 12, 0.12)');
+      glow.addColorStop(0.75, 'rgba(180, 83, 9, 0.04)');
+      glow.addColorStop(1, 'transparent');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y - 10, 160 * flicker, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Iron Sconce Bracket
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(x - 4, y, 8, 28);
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(x, y + 28, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Torch Cup
+      ctx.fillStyle = '#334155';
+      ctx.beginPath();
+      ctx.moveTo(x - 9, y - 4);
+      ctx.lineTo(x + 9, y - 4);
+      ctx.lineTo(x + 5, y + 10);
+      ctx.lineTo(x - 5, y + 10);
+      ctx.closePath();
+      ctx.fill();
+
+      // Animated Flame Tongues
+      ctx.save();
+      const flameH = 24 * flicker;
+      const flameW = 12 * flicker;
+
+      // Outer Red
+      ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.ellipse(x, y - 10, flameW, flameH, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Middle Orange/Amber
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.ellipse(x, y - 8, flameW * 0.7, flameH * 0.75, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Inner Bright Core
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.ellipse(x, y - 5, flameW * 0.35, flameH * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // --- ARCADE COMBAT IMPACT BURST (Fighting Game Slash & Hit Spark) ---
+    function drawImpactBurst(ctx, w, h, state) {
+      if (!state.active) return;
+      const t = state.progress; // 0..1
+      if (t > 0.6) return;
+
+      const alpha = Math.max(0, 1.0 - t / 0.6);
+      const isRight = state.side === 'right';
+      const hitX = w / 2 + (isRight ? 16 : -16);
+      const hitY = h * 0.44;
+
+      ctx.save();
+      ctx.translate(hitX, hitY);
+      ctx.globalAlpha = alpha;
+
+      // 1. Comic Impact Slash Arcs (Fast dynamic cuts)
+      const slashAngle = isRight ? -0.45 : 0.45;
+      ctx.rotate(slashAngle);
+
+      const slashLen = (40 + t * 90) * (state.isCrit ? 1.3 : 1.0);
+      ctx.strokeStyle = state.isCrit ? '#fef08a' : '#ffffff';
+      ctx.lineWidth = state.isCrit ? 6 : 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-slashLen * 0.5, 0);
+      ctx.lineTo(slashLen * 0.5, 0);
+      ctx.stroke();
+
+      // Outer glow slash
+      ctx.strokeStyle = state.isCrit ? '#f59e0b' : '#f43f5e';
+      ctx.lineWidth = state.isCrit ? 12 : 8;
+      ctx.beginPath();
+      ctx.moveTo(-slashLen * 0.4, 0);
+      ctx.lineTo(slashLen * 0.4, 0);
+      ctx.stroke();
+
+      // Secondary cross slash
+      ctx.rotate(1.2);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-slashLen * 0.35, 0);
+      ctx.lineTo(slashLen * 0.35, 0);
+      ctx.stroke();
+
+      // 2. Comic Hit Flash Core (Expanding star)
+      const starR = (16 + t * 45) * (state.isCrit ? 1.4 : 1.0);
+      ctx.fillStyle = state.isCrit ? '#fef08a' : '#ffffff';
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const r = (i % 2 === 0) ? starR : starR * 0.35;
+        const a = (i * Math.PI) / 4;
+        const sx = Math.cos(a) * r;
+        const sy = Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(sx, sy);
+        else ctx.lineTo(sx, sy);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // --- PERSISTENT FIRST-PERSON BOXER GUARD (Punch-Out Style) ---
+    function drawBoxerGuard(ctx, w, h, t, state) {
+      if (!guardLeftImg.complete || !guardRightImg.complete) return;
+      if (guardLeftImg.naturalWidth <= 0 || guardRightImg.naturalWidth <= 0) return;
+
+      // Base guard scale & dimensions
+      const baseArmW = 165;
+      const baseArmH = baseArmW * (guardLeftImg.naturalHeight / guardLeftImg.naturalWidth);
+
+      // Idle breathing bobbing (organic subtle rhythm)
+      const idleBobY = Math.sin(t * 3.2) * 5;
+      const idleBobX = Math.cos(t * 1.6) * 2;
+
+      // Resting positions at bottom corners (arms rising from bottom edge)
+      const restLeftX = w * 0.20 + idleBobX;
+      const restLeftY = h - baseArmH * 0.38 + idleBobY;
+
+      const restRightX = w * 0.80 - idleBobX;
+      const restRightY = h - baseArmH * 0.38 + idleBobY;
+
+      // Punch trajectory calculation
+      const punchActive = state.active;
+      const punchT = state.progress; // 0..1
+      const isRightPunch = state.side === 'right';
+
+      let punchReach = 0;
+      let punchScale = 1.0;
+
+      if (punchActive) {
+        if (punchT < 0.38) {
+          // Fast piston punch forward
+          const p = punchT / 0.38;
+          punchReach = Math.sin(p * Math.PI * 0.5);
+          punchScale = 1.0 + punchReach * 0.28;
+        } else if (punchT < 0.54) {
+          // Impact hold with micro impact recoil
+          punchReach = 1.0 + Math.sin(punchT * 80) * 0.02;
+          punchScale = 1.28;
+        } else {
+          // Snap back smoothly into guard position
+          const p = (punchT - 0.54) / 0.46;
+          punchReach = 1.0 - Math.pow(p, 1.5);
+          punchScale = 1.0 + punchReach * 0.28;
+        }
+      }
+
+      // 1. LEFT GLOVE (Punches or rests in guard)
+      ctx.save();
+      let leftX = restLeftX;
+      let leftY = restLeftY;
+      let leftScale = 1.0;
+      let leftRot = 0;
+
+      if (punchActive && !isRightPunch) {
+        // Left punch travels from rest position towards the boss jaw
+        const targetX = w * 0.42;
+        const targetY = h * 0.50;
+        leftX = restLeftX + (targetX - restLeftX) * punchReach;
+        leftY = restLeftY + (targetY - restLeftY) * punchReach;
+        leftScale = punchScale;
+        leftRot = -0.12 * punchReach;
+      }
+
+      const leftPunchReach = (punchActive && !isRightPunch) ? punchReach : 0;
+      const curLeftW = baseArmW * leftScale;
+      const curLeftH = curLeftW * (guardLeftImg.naturalHeight / guardLeftImg.naturalWidth) * (1.0 + leftPunchReach * 0.55);
+      const leftAnchorY = leftPunchReach * curLeftH * 0.25;
+
+      ctx.translate(leftX, leftY + leftAnchorY);
+      ctx.rotate(leftRot);
+      ctx.drawImage(guardLeftImg, -curLeftW * 0.5, -curLeftH * 0.5, curLeftW, curLeftH);
+      ctx.restore();
+
+      // 2. RIGHT GLOVE (Punches or rests in guard)
+      ctx.save();
+      let rightX = restRightX;
+      let rightY = restRightY;
+      let rightScale = 1.0;
+      let rightRot = 0;
+
+      if (punchActive && isRightPunch) {
+        // Right punch travels from rest position towards the boss jaw
+        const targetX = w * 0.56;
+        const targetY = h * 0.50;
+        rightX = restRightX + (targetX - restRightX) * punchReach;
+        rightY = restRightY + (targetY - restRightY) * punchReach;
+        rightScale = punchScale;
+        rightRot = 0.12 * punchReach;
+      }
+
+      const rightPunchReach = (punchActive && isRightPunch) ? punchReach : 0;
+      const curRightW = baseArmW * rightScale;
+      const curRightH = curRightW * (guardRightImg.naturalHeight / guardRightImg.naturalWidth) * (1.0 + rightPunchReach * 0.55);
+      const rightAnchorY = rightPunchReach * curRightH * 0.25;
+
+      ctx.translate(rightX, rightY + rightAnchorY);
+      ctx.rotate(rightRot);
+      ctx.drawImage(guardRightImg, -curRightW * 0.5, -curRightH * 0.5, curRightW, curRightH);
+      ctx.restore();
+    }
+
+    // --- MAIN RENDER LOOP ---
+    function render(now) {
+      const dt = Math.min(0.1, (now - lastTime) / 1000);
+      lastTime = now;
+      time += dt;
+
+      // FPS Monitor
+      frameCount++;
+      if (now - fpsTime > 500) {
+        document.getElementById('fps-display').textContent = Math.round((frameCount * 1000) / (now - fpsTime)) + ' FPS';
+        frameCount = 0;
+        fpsTime = now;
+      }
+
+      // Combo Timeout (2.5s)
+      if (comboCount > 0 && now - lastHitTime > 2500) {
+        comboCount = 0;
+        document.getElementById('combo-banner').classList.add('hidden');
+        document.getElementById('combo-display').textContent = 'COMBO: x0';
+      }
+
+      // 1. Spring Physics for Squash & Stretch (Damped Harmonic Oscillator)
+      const springK = 230; // Snappy elastic spring
+      const damping = 15;  // Critically damped
+
+      const forceX = -springK * (squashScaleX - 1.0) - damping * squashVelX;
+      squashVelX += forceX * dt;
+      squashScaleX += squashVelX * dt;
+
+      const forceY = -springK * (squashScaleY - 1.0) - damping * squashVelY;
+      squashVelY += forceY * dt;
+      squashScaleY += squashVelY * dt;
+
+      // 2. Recoil Dampening
+      recoilX += (0 - recoilX) * 16 * dt;
+      recoilRot += (0 - recoilRot) * 18 * dt;
+
+      // 3. Screen Trauma Shake Decay
+      trauma = Math.max(0, trauma - dt * 2.8);
+      const shakeAmt = trauma * trauma;
+      const shakeX = (Math.random() * 2 - 1) * 18 * shakeAmt;
+      const shakeY = (Math.random() * 2 - 1) * 14 * shakeAmt;
+
+      // 4. Hit Flash & Hurt State Decay
+      if (!urlParams.get('freeze')) {
+        if (hitFlashTimer > 0) hitFlashTimer -= dt;
+        if (hurtTimer > 0) hurtTimer -= dt;
+      }
+
+      // 5. Punch Animation Progress
+      if (punchState.active) {
+        if (!urlParams.get('freeze')) {
+          punchState.progress += dt / punchState.duration;
+          if (punchState.progress >= 1.0) {
+            punchState.active = false;
+            punchState.progress = 0;
+          }
+        }
+      }
+
+      // 6. Death Progress
+      if (isDead && deathProgress < 1) {
+        deathProgress = Math.min(1, deathProgress + dt * 1.6);
+      }
+
+      // --- CLEAR CANVAS ---
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // --- 1. RENDER DUNGEON ARENA ENVIRONMENT ---
+      drawDungeonArena(ctx, canvas.width, canvas.height, time);
+
+      // --- 2. AMBIENT FLOATING EMBERS ---
+      ctx.save();
+      for (const ember of ambientEmbers) {
+        ember.y += ember.vy;
+        ember.x += ember.vx;
+        if (ember.y < 0) {
+          ember.y = canvas.height;
+          ember.x = Math.random() * canvas.width;
+        }
+        ctx.fillStyle = `${ember.color} ${ember.alpha * (Math.sin(time * 2.5 + ember.x) * 0.3 + 0.7)})`;
+        ctx.beginPath();
+        ctx.arc(ember.x, ember.y, ember.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // --- 3. ARENA MONSTER ROOT WITH SCREEN SHAKE ---
+      const floorContactY = canvas.height - 35;
+
+      ctx.save();
+      ctx.translate(canvas.width / 2 + shakeX, floorContactY + shakeY);
+
+      // Dynamic Idle Breathing
+      const breathY = 1.0 + Math.sin(time * 3.2) * 0.022;
+      const breathX = 1.0 - Math.sin(time * 3.2) * 0.014;
+      const idleSway = Math.sin(time * 1.6) * 0.02;
+
+      // Contact Dynamic Floor Shadow (Breathes and scales on stone tiles)
+      if (isDead && deathProgress >= 0.22) {
+        // Wide contact shadow beneath fallen boss
+        ctx.save();
+        ctx.translate(0, 4);
+        const koShadowGrad = ctx.createRadialGradient(0, 0, 20, 0, 0, 165);
+        koShadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.95)');
+        koShadowGrad.addColorStop(0.55, 'rgba(0, 0, 0, 0.5)');
+        koShadowGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = koShadowGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 155, 36, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else {
+        const shadowScale = (1.0 - (isDead ? deathProgress / 0.22 : 0) * 0.7) * squashScaleX * breathX;
+        ctx.save();
+        ctx.translate(recoilX * 0.35, 2);
+        ctx.scale(Math.max(0.1, shadowScale), Math.max(0.1, shadowScale));
+        const shadowGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, 110);
+        shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.9)');
+        shadowGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0.45)');
+        shadowGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = shadowGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 105, 24, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // --- RENDER CHARACTER (ALIVE OR KNOCKED OUT) ---
+      if (isDead && deathProgress >= 0.22) {
+        // === CINEMATIC K.O. KNOCKOUT SEQUENCE ===
+        // The goblin warrior lies knocked out on the dungeon floor with stars swirling
+        if (bossKoImg.complete && bossKoImg.naturalWidth > 0) {
+          ctx.save();
+
+          // Floor Landing Bounce Physics
+          const bounceT = Math.min(1.0, (deathProgress - 0.22) / 0.35);
+          // Damped bounce when hitting stone pavement
+          const bounceY = -Math.abs(Math.sin(bounceT * Math.PI * 2.5)) * 14 * Math.exp(-bounceT * 3.5);
+          const squishX = 1.0 + Math.sin(bounceT * Math.PI) * 0.08 * Math.exp(-bounceT * 3.0);
+          const squishY = 1.0 - Math.sin(bounceT * Math.PI) * 0.08 * Math.exp(-bounceT * 3.0);
+
+          // Subtle unconscious chest breathing
+          const unconsciousBreath = 1.0 + Math.sin(time * 2.2) * 0.015;
+
+          ctx.translate(0, bounceY);
+          ctx.scale(squishX * unconsciousBreath, squishY * unconsciousBreath);
+
+          const koHeight = 240;
+          const koAspect = bossKoImg.naturalWidth / bossKoImg.naturalHeight;
+          const koWidth = koHeight * koAspect;
+          const drawKoX = -koWidth / 2;
+          const drawKoY = -koHeight + 42; // Firmly rested on dungeon floor stone
+
+          ctx.drawImage(bossKoImg, drawKoX, drawKoY, koWidth, koHeight);
+
+          // Orbiting Comic Dizzy Stars around goblin's bruised head
+          // Head in goblin_ko.png is top-right (approx 71% width, 28% height from top)
+          const headCanvasX = drawKoX + koWidth * 0.71;
+          const headCanvasY = drawKoY + koHeight * 0.28;
+          const starOrbitRx = 40;
+          const starOrbitRy = 14;
+          const starTilt = -0.25;
+
+          for (let i = 0; i < 4; i++) {
+            const starPhase = time * 3.8 + (i * Math.PI * 2) / 4;
+            const rawSx = Math.cos(starPhase) * starOrbitRx;
+            const rawSy = Math.sin(starPhase) * starOrbitRy;
+            const sx = headCanvasX + (rawSx * Math.cos(starTilt) - rawSy * Math.sin(starTilt));
+            const sy = headCanvasY - 18 + (rawSx * Math.sin(starTilt) + rawSy * Math.cos(starTilt));
+
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(time * 4.5 + i);
+            const starScale = 0.85 + Math.sin(time * 6 + i * 2) * 0.2;
+            ctx.scale(starScale, starScale);
+            ctx.fillStyle = (i % 2 === 0) ? '#facc15' : '#fef08a';
+            ctx.shadowColor = '#eab308';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            for (let s = 0; s < 8; s++) {
+              const r = (s % 2 === 0) ? 7.5 : 2.8;
+              const a = (s * Math.PI) / 4;
+              if (s === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+              else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+          }
+
+          ctx.restore();
+        }
+      } else if (bossImg.complete && bossImg.naturalWidth > 0) {
+        // === STANDING BOSS (ACTIVE OR FATAL RECOIL) ===
+        ctx.save();
+
+        if (isDead) {
+          // Fatal blow hit phase (< 0.22s): standing boss violently reels backwards
+          const fatalPhase = deathProgress / 0.22;
+          ctx.translate(recoilX - fatalPhase * 50, -Math.sin(fatalPhase * Math.PI) * 20);
+          ctx.rotate(-0.35 * fatalPhase);
+          ctx.scale(1.0 - fatalPhase * 0.15, 1.0 + fatalPhase * 0.1);
+        } else {
+          // Alive Boss Transform
+          ctx.translate(recoilX, 0);
+          // Emotion modulation: if HP < 40, panic tremble!
+          let panicTremble = 0;
+          if (hp < 40) {
+            panicTremble = Math.sin(time * 28) * 0.02; // frantic shivering
+          }
+          ctx.rotate(idleSway + recoilRot + panicTremble);
+          ctx.scale(squashScaleX * breathX, squashScaleY * breathY);
+        }
+
+        // Draw Boss with Hit Flash & Hurt/Panic Emotion State
+        let currentBossImg = bossImg;
+        if (hurtTimer > 0 && bossHurtImg.complete && bossHurtImg.naturalWidth > 0) {
+          currentBossImg = bossHurtImg;
+        } else if (hp < 45 && bossPanicImg.complete && bossPanicImg.naturalWidth > 0) {
+          currentBossImg = bossPanicImg;
+        }
+
+        const targetHeight = 340;
+        const aspect = currentBossImg.naturalWidth / currentBossImg.naturalHeight;
+        const targetWidth = targetHeight * aspect;
+        const drawX = -targetWidth / 2;
+        const drawY = -targetHeight;
+
+        if (hitFlashTimer > 0) {
+          const brightVal = 1.0 + Math.min(2.0, hitFlashTimer * 15);
+          ctx.filter = `brightness(${brightVal}) contrast(1.15)`;
+        }
+        ctx.drawImage(currentBossImg, drawX, drawY, targetWidth, targetHeight);
+        ctx.filter = 'none';
+
+        // Pain Details on impact (Blood and sweat droplets bursting from jaw)
+        if (hurtTimer > 0.04) {
+          ctx.save();
+          const mouthY = drawY + targetHeight * 0.28;
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(recoilX * 0.4 + 18, mouthY - 4, 3.5, 0, Math.PI * 2);
+          ctx.arc(recoilX * 0.4 + 32, mouthY + 6, 2.5, 0, Math.PI * 2);
+          ctx.arc(recoilX * 0.4 - 22, mouthY - 2, 2.0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#fef08a';
+          ctx.beginPath();
+          ctx.arc(recoilX * 0.4 + 8, mouthY - 14, 2.0, 0, Math.PI * 2);
+          ctx.arc(recoilX * 0.4 - 14, mouthY - 12, 1.8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Panic sweat droplets when low HP (<35%)
+        if (hp < 40 && !isDead) {
+          ctx.save();
+          const browY = drawY + targetHeight * 0.20;
+          ctx.fillStyle = 'rgba(147, 197, 253, 0.85)';
+          const dripOffset = (time * 60) % 24;
+          ctx.beginPath();
+          ctx.arc(28, browY + dripOffset, 2.2, 0, Math.PI * 2);
+          ctx.arc(-24, browY + (dripOffset * 0.7), 1.8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        ctx.restore();
+      }
+
+      ctx.restore(); // End Arena Monster Root
+
+      // --- 4. SHOCKWAVE EXPANDING RINGS ---
+      ctx.save();
+      for (let i = shockwaves.length - 1; i >= 0; i--) {
+        const sw = shockwaves[i];
+        sw.r += sw.vr * dt;
+        sw.alpha -= sw.decay * dt;
+        if (sw.alpha <= 0 || sw.r <= 0) {
+          shockwaves.splice(i, 1);
+          continue;
+        }
+        ctx.strokeStyle = sw.color;
+        ctx.globalAlpha = sw.alpha;
+        ctx.lineWidth = sw.lineWidth;
+        ctx.beginPath();
+        ctx.arc(sw.x, sw.y, Math.max(0.1, sw.r), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // --- 5. IMPACT SPARKS PARTICLES ---
+      ctx.save();
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const p = sparks[i];
+        p.x += p.vx * dt * 60;
+        p.y += p.vy * dt * 60;
+        p.vy += 0.42; // Gravity
+        p.alpha -= 0.038;
+        p.size *= 0.94;
+
+        if (p.alpha <= 0 || p.size <= 0.1) {
+          sparks.splice(i, 1);
+          continue;
+        }
+
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.alpha;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, Math.max(0.1, p.size), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // --- 6. FIRST-PERSON BOXER GUARD & PUNCHES (Punch-Out Style) ---
+      drawBoxerGuard(ctx, canvas.width, canvas.height, time, punchState);
+
+      // --- 7. ARCADE IMPACT BURST (Comic slashes, star sparks & impact rings) ---
+      drawImpactBurst(ctx, canvas.width, canvas.height, punchState);
+
+      requestAnimationFrame(render);
+    }
+
+    requestAnimationFrame(render);
+
+    // --- COMBAT HIT TRIGGER (PUNCH / PUSH-UP) ---
+    function triggerHit() {
+      if (isDead) return;
+
+      const now = performance.now();
+      lastHitTime = now;
+      comboCount++;
+
+      // Trigger Impact Burst Animation
+      punchState.active = true;
+      punchState.progress = 0;
+      punchState.side = (comboCount % 2 === 1) ? 'right' : 'left';
+      punchState.isCrit = Math.random() > 0.65 || comboCount >= 4;
+
+      // Update Combo Counter
+      const comboBanner = document.getElementById('combo-banner');
+      const comboText = document.getElementById('combo-text');
+      comboBanner.classList.remove('hidden');
+      comboText.innerHTML = `${comboCount}x COMBO! ${comboCount >= 3 ? '🔥' : '⚡'}`;
+      comboText.classList.remove('animate-combo');
+      void comboText.offsetWidth; // Reflow
+      comboText.classList.add('animate-combo');
+      document.getElementById('combo-display').textContent = `COMBO: x${comboCount}`;
+
+      playPunchSound(punchState.isCrit);
+
+      // SQUASH & STRETCH IMPACT INJECTION:
+      const forceMult = punchState.isCrit ? 1.22 : 1.0;
+      squashScaleX = 1.15 * forceMult;
+      squashScaleY = 0.87 / forceMult;
+      squashVelX = 0.9 * forceMult;
+      squashVelY = -0.9 * forceMult;
+
+      // Recoil & Tilt (Punch impact sway)
+      recoilX = (punchState.side === 'right' ? 22 : -22) * forceMult;
+      recoilRot = (punchState.side === 'right' ? -0.09 : 0.09) * forceMult;
+
+      // Screen Trauma Shake
+      trauma = Math.min(1.0, trauma + (punchState.isCrit ? 0.75 : 0.5));
+
+      // Whiteout Hit Flash & Hurt State Duration
+      hitFlashTimer = punchState.isCrit ? 0.09 : 0.06;
+      hurtTimer = punchState.isCrit ? 0.22 : 0.17;
+      const flash = document.getElementById('flash-overlay');
+      flash.style.opacity = punchState.isCrit ? '0.5' : '0.3';
+      setTimeout(() => { flash.style.opacity = '0'; }, 40);
+
+      // Impact Shockwave Ring
+      const hitX = canvas.width / 2 + (punchState.side === 'right' ? 15 : -15);
+      const hitY = canvas.height * 0.48;
+      shockwaves.push({
+        x: hitX,
+        y: hitY,
+        r: 10,
+        vr: punchState.isCrit ? 380 : 270,
+        alpha: 0.95,
+        decay: 3.2,
+        lineWidth: punchState.isCrit ? 5 : 3,
+        color: punchState.isCrit ? '#fbbf24' : '#f43f5e'
+      });
+
+      // Impact Spark Burst
+      const sparkCount = punchState.isCrit ? 24 : 16;
+      for (let i = 0; i < sparkCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 4 + Math.random() * 9 * forceMult;
+        sparks.push({
+          x: hitX + (Math.random() - 0.5) * 20,
+          y: hitY + (Math.random() - 0.5) * 20,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 2.5,
+          size: 2.5 + Math.random() * 4.0,
+          color: punchState.isCrit ? '#fbbf24' : '#f43f5e',
+          alpha: 1.0
+        });
+      }
+
+      // Damage Calculation & Popups
+      const baseDmg = Math.floor(22 + Math.random() * 16);
+      const finalDmg = punchState.isCrit ? Math.floor(baseDmg * 1.65) : baseDmg;
+
+      hp = Math.max(0, hp - finalDmg);
+      updateHpUi();
+      spawnDamageNumber(finalDmg, punchState.isCrit);
+
+      if (hp <= 0) {
+        handleDeath();
+      }
+    }
+
+    function spawnDamageNumber(dmg, isCrit) {
+      const container = document.getElementById('damage-container');
+      const el = document.createElement('div');
+      el.className = 'absolute font-black tracking-tighter pointer-events-none drop-shadow-lg';
+      el.style.left = (40 + Math.random() * 18) + '%';
+      el.style.top = (30 + Math.random() * 18) + '%';
+
+      if (isCrit) {
+        el.className += ' text-amber-300 text-3xl sm:text-4xl font-black italic drop-shadow-[0_4px_16px_rgba(251,191,36,0.95)]';
+        el.innerHTML = `-${dmg} <span class="text-xs uppercase font-extrabold text-rose-500 bg-rose-950/90 px-1.5 py-0.5 rounded border border-rose-800">CRIT! 🔥</span>`;
+      } else {
+        el.className += ' text-rose-400 text-2xl sm:text-3xl font-black drop-shadow-[0_2px_10px_rgba(244,63,94,0.8)]';
+        el.innerText = `-${dmg}`;
+      }
+
+      el.style.animation = 'floatUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards';
+      container.appendChild(el);
+      setTimeout(() => el.remove(), 800);
+    }
+
+    function updateHpUi() {
+      const pct = (hp / maxHp) * 100;
+      document.getElementById('hp-main-bar').style.width = pct + '%';
+      setTimeout(() => {
+        document.getElementById('hp-ghost-bar').style.width = pct + '%';
+      }, 160);
+      document.getElementById('hp-text').innerText = `${hp} / ${maxHp} HP`;
+    }
+
+    function handleDeath() {
+      isDead = true;
+      deathProgress = 0;
+      setTimeout(() => {
+        document.getElementById('ko-banner').style.opacity = '1';
+      }, 450);
+    }
+
+    function resetGame() {
+      hp = maxHp;
+      isDead = false;
+      deathProgress = 0;
+      comboCount = 0;
+      squashScaleX = 1.0;
+      squashScaleY = 1.0;
+      squashVelX = 0;
+      squashVelY = 0;
+      punchState.active = false;
+      updateHpUi();
+      document.getElementById('ko-banner').style.opacity = '0';
+      document.getElementById('combo-banner').classList.add('hidden');
+      document.getElementById('combo-display').textContent = 'COMBO: x0';
+    }
+
+    // Spacebar Listener
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        triggerHit();
+      }
+    });
+
+    // Auto-trigger for visual testing if requested via query param
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('test_ko')) {
+      hp = 0;
+      isDead = true;
+      deathProgress = 1.0;
+      updateHpUi();
+      document.getElementById('ko-banner').style.opacity = '1';
+    } else if (urlParams.get('test_panic')) {
+      hp = 30;
+      updateHpUi();
+    } else if (urlParams.get('test_hit')) {
+      triggerHit();
+      if (urlParams.get('left')) { punchState.side = 'left'; }
+      if (urlParams.get('freeze')) {
+        punchState.active = true;
+        punchState.progress = 0.44; // Peak impact frame
+        hurtTimer = 999; // Freeze hurt reaction face
+        hitFlashTimer = 0.05;
+      }
+    }
+
+    // --- WEBCAM PUSH-UP DETECTION (Optical Flow / Luminance Tracking) ---
+    let webcamActive = false;
+    let webcamStream = null;
+    let pushupState = 'UP'; // 'UP' or 'DOWN'
+    let pushupReps = 0;
+    let motionLoopRunning = false;
+
+    async function toggleWebcam() {
+      const btn = document.getElementById('btn-camera');
+      const pip = document.getElementById('cam-pip-container');
+      const statusPill = document.getElementById('cam-status-pill');
+      const statusText = document.getElementById('cam-status-text');
+      const video = document.getElementById('webcam-video');
+
+      if (webcamActive) {
+        if (webcamStream) {
+          webcamStream.getTracks().forEach(t => t.stop());
+          webcamStream = null;
+        }
+        webcamActive = false;
+        motionLoopRunning = false;
+        pip.classList.add('hidden');
+        statusPill.classList.add('hidden');
+        btn.classList.remove('bg-rose-950', 'border-rose-700', 'text-rose-300');
+        btn.classList.add('bg-indigo-900/60', 'border-indigo-700/60', 'text-indigo-200');
+        document.getElementById('cam-btn-label').textContent = 'Включить камеру';
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 320, height: 240, facingMode: 'user' },
+          audio: false
+        });
+        video.srcObject = stream;
+        webcamStream = stream;
+        webcamActive = true;
+        pip.classList.remove('hidden');
+        statusPill.classList.remove('hidden');
+        statusText.textContent = 'КАМЕРА: АКТИВНА';
+
+        btn.classList.remove('bg-indigo-900/60', 'border-indigo-700/60', 'text-indigo-200');
+        btn.classList.add('bg-rose-950', 'border-rose-700', 'text-rose-300');
+        document.getElementById('cam-btn-label').textContent = 'Выключить камеру';
+
+        if (!motionLoopRunning) {
+          motionLoopRunning = true;
+          startMotionAnalysis();
+        }
+      } catch (err) {
+        alert('Не удалось подключить камеру: ' + err.message);
+      }
+    }
+
+    function startMotionAnalysis() {
+      const video = document.getElementById('webcam-video');
+      const mCanvas = document.getElementById('motion-canvas');
+      const mCtx = mCanvas.getContext('2d');
+      const depthBar = document.getElementById('depth-bar');
+      const repProgress = document.getElementById('rep-progress');
+      const repCounter = document.getElementById('rep-counter');
+      const statusText = document.getElementById('cam-status-text');
+
+      let smoothedPos = 0.5;
+
+      function checkMotion() {
+        if (!webcamActive) return;
+
+        if (video.readyState >= 2) {
+          mCtx.drawImage(video, 0, 0, mCanvas.width, mCanvas.height);
+          const frame = mCtx.getImageData(0, 0, mCanvas.width, mCanvas.height);
+          const d = frame.data;
+
+          let totalWeight = 0;
+          let weightedY = 0;
+
+          for (let y = 0; y < mCanvas.height; y++) {
+            for (let x = 0; x < mCanvas.width; x++) {
+              const idx = (y * mCanvas.width + x) * 4;
+              const brightness = (d[idx] + d[idx+1] + d[idx+2]) / 3;
+              const weight = 255 - brightness;
+              totalWeight += weight;
+              weightedY += y * weight;
+            }
+          }
+
+          if (totalWeight > 0) {
+            const currentY = (weightedY / totalWeight) / mCanvas.height;
+            smoothedPos = smoothedPos * 0.8 + currentY * 0.2;
+
+            const depth = Math.max(0, Math.min(1.0, (smoothedPos - 0.42) / 0.18));
+            depthBar.style.width = (depth * 100) + '%';
+            repProgress.style.width = (depth * 100) + '%';
+
+            if (pushupState === 'UP' && depth > 0.65) {
+              pushupState = 'DOWN';
+              statusText.textContent = 'ВНИЗУ... ДЕРЖИ!';
+              statusText.className = 'text-amber-400';
+            } else if (pushupState === 'DOWN' && depth < 0.35) {
+              pushupState = 'UP';
+              pushupReps++;
+              repCounter.textContent = `${pushupReps} REPS`;
+              statusText.textContent = 'ВВЕРХ! УДАР! 🥊';
+              statusText.className = 'text-emerald-400';
+              triggerHit();
+            }
+          }
+        }
+
+        requestAnimationFrame(checkMotion);
+      }
+
+      requestAnimationFrame(checkMotion);
+    }
+  </script>
+</body>
+</html>

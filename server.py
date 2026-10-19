@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from config import (
@@ -41,6 +42,33 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Static assets mount for monsters and previews
+os.makedirs("assets", exist_ok=True)
+app.mount("/assets", StaticFiles(directory="assets"), name="assets")
+
+@app.get("/arena")
+async def get_arena():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/assets/monsters/goblin_puppet/arena.html")
+
+@app.get("/arena3d")
+async def get_arena_3d():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/assets/monsters/goblin_puppet/arena_3d.html")
+
+@app.get("/tools/content.js")
+async def get_content_js():
+    from fastapi.responses import FileResponse
+    return FileResponse("tools/ai_studio_extension/content.js", media_type="application/javascript")
+
+# Sprite Bridge State
+sprite_bridge_state = {
+    "tab_connected": False,
+    "last_ping": 0,
+    "pending_task": None,
+    "latest_result": None
+}
 
 active_worker: Optional[WorkerEngine] = None
 board_room = BoardRoom()
@@ -123,6 +151,163 @@ class BoardDebateRequest(BaseModel):
 class BoardApplyRequest(BaseModel):
     role: str  # "tech_lead", "director", or "debate"
 
+
+
+class SpriteTaskRequest(BaseModel):
+    prompt: Optional[str] = None
+    num_frames: Optional[int] = 6
+    target: Optional[str] = "boss" # "boss", "arena_bg", "goblin_hurt", "player_fist"
+
+
+class SpriteResultPayload(BaseModel):
+    task_id: str
+    image_base64: str
+
+
+# --- Sprite Bridge Endpoints ---
+
+@app.get("/api/bridge/status")
+async def get_bridge_status():
+    import time
+    is_alive = (time.time() - sprite_bridge_state["last_ping"]) < 45 if sprite_bridge_state["last_ping"] else False
+    return {
+        "ok": True,
+        "connected": is_alive,
+        "has_pending_task": sprite_bridge_state["pending_task"] is not None,
+        "pending_task": sprite_bridge_state["pending_task"],
+        "latest_result": sprite_bridge_state["latest_result"]
+    }
+
+
+@app.post("/api/bridge/task")
+async def create_bridge_task(req: SpriteTaskRequest):
+    import time
+    default_prompt = (
+        "2D video game animation sprite sheet of a skinny green goblin character with droopy tired eyes, "
+        "wearing a ragged brown tunic and holding pink dumbbells. "
+        "Generate 6 separate frames for an idle breathing animation cycle in a single horizontal strip. "
+        "IMPORTANT: Each frame must be widely spaced apart with generous empty padding between characters, "
+        "so arms, weapons and ears never touch or overlap. Solid bright red background #FF0000 for easy chroma key. "
+        "Feet must remain firmly planted at the exact same ground level across all 6 frames."
+    )
+    task_id = f"task_{int(time.time())}"
+    sprite_bridge_state["pending_task"] = {
+        "id": task_id,
+        "prompt": req.prompt or default_prompt,
+        "num_frames": req.num_frames or 6,
+        "target": req.target or "boss",
+        "created_at": time.time()
+    }
+    sprite_bridge_state["latest_result"] = None
+    return {"ok": True, "task_id": task_id, "prompt": sprite_bridge_state["pending_task"]["prompt"]}
+
+
+@app.get("/api/bridge/poll")
+async def poll_bridge_task():
+    import time
+    sprite_bridge_state["last_ping"] = time.time()
+    sprite_bridge_state["tab_connected"] = True
+    task = sprite_bridge_state["pending_task"]
+    return {"ok": True, "task": task}
+
+
+@app.post("/api/bridge/clear")
+async def clear_bridge_task():
+    sprite_bridge_state["pending_task"] = None
+    return {"ok": True}
+
+
+@app.post("/api/bridge/result")
+async def submit_bridge_result(payload: SpriteResultPayload):
+    import time
+    import base64
+    from tools.slice_spritesheet import slice_spritesheet
+    
+    raw_b64 = payload.image_base64
+    if "," in raw_b64:
+        raw_b64 = raw_b64.split(",", 1)[1]
+    img_bytes = base64.b64decode(raw_b64)
+
+    target = "boss"
+    num_frames = 1
+    if sprite_bridge_state["pending_task"]:
+        target = sprite_bridge_state["pending_task"].get("target", "boss")
+        num_frames = sprite_bridge_state["pending_task"].get("num_frames", 1)
+
+    from PIL import Image
+    import numpy as np
+
+    if target == "arena_bg":
+        out_path = os.path.abspath("assets/monsters/goblin_puppet/arena_bg.png")
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        with open(out_path, "wb") as f:
+            f.write(img_bytes)
+        sprite_bridge_state["pending_task"] = None
+        sprite_bridge_state["latest_result"] = {
+            "task_id": payload.task_id,
+            "preview_url": "/assets/monsters/goblin_puppet/arena.html",
+            "image": "/assets/monsters/goblin_puppet/arena_bg.png",
+            "target": "arena_bg",
+            "timestamp": time.time()
+        }
+        return {"ok": True, "image": "/assets/monsters/goblin_puppet/arena_bg.png"}
+
+    elif num_frames == 1 or target in ["goblin_hurt", "player_fist", "boss"]:
+        raw_name = f"{target}_raw.png"
+        raw_path = os.path.abspath(f"assets/monsters/goblin_puppet/{raw_name}")
+        os.makedirs(os.path.dirname(raw_path), exist_ok=True)
+        with open(raw_path, "wb") as f:
+            f.write(img_bytes)
+
+        # High quality alpha cutout with rembg
+        try:
+            from rembg import remove
+            input_img = Image.open(raw_path)
+            cutout_img = remove(input_img)
+            # Crop to character bounding box
+            arr = np.array(cutout_img)
+            alpha = arr[:, :, 3]
+            nonzero_y, nonzero_x = np.nonzero(alpha > 10)
+            if len(nonzero_y) > 0 and len(nonzero_x) > 0:
+                y_min, y_max = nonzero_y.min(), nonzero_y.max()
+                x_min, x_max = nonzero_x.min(), nonzero_x.max()
+                cutout_img = cutout_img.crop((x_min, y_min, x_max + 1, y_max + 1))
+            
+            clean_name = f"{target}.png" if target != "boss" else "goblin_boss.png"
+            clean_path = os.path.abspath(f"assets/monsters/goblin_puppet/{clean_name}")
+            cutout_img.save(clean_path)
+            if target == "boss":
+                cutout_img.save(os.path.abspath("assets/monsters/goblin_boss_clean.png"))
+        except Exception as e:
+            print("rembg cutout error:", e)
+            img = Image.open(raw_path).convert('RGBA')
+            img.save(os.path.abspath(f"assets/monsters/goblin_puppet/{target}.png"))
+
+        sprite_bridge_state["pending_task"] = None
+        sprite_bridge_state["latest_result"] = {
+            "task_id": payload.task_id,
+            "preview_url": "/assets/monsters/goblin_puppet/arena.html",
+            "target": target,
+            "timestamp": time.time()
+        }
+        return {"ok": True, "target": target}
+    else:
+        raw_path = os.path.abspath("assets/monsters/goblin_raw_sheet.png")
+        os.makedirs(os.path.dirname(raw_path), exist_ok=True)
+        with open(raw_path, "wb") as f:
+            f.write(img_bytes)
+
+        preview_file = slice_spritesheet(raw_path, num_frames=num_frames, output_dir="assets/monsters/goblin_idle")
+
+        sprite_bridge_state["pending_task"] = None
+        sprite_bridge_state["latest_result"] = {
+            "task_id": payload.task_id,
+            "preview_url": "/assets/monsters/goblin_idle/preview.html",
+            "frames_dir": "/assets/monsters/goblin_idle",
+            "frames_count": num_frames,
+            "timestamp": time.time()
+        }
+        return {"ok": True, "preview": preview_file}
 
 
 # --- Endpoints ---
