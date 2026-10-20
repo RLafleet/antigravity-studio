@@ -30,7 +30,7 @@
     </div>
 
     <!-- 3D Canvas Box -->
-    <div id="canvas-container" class="w-full h-[500px] bg-black rounded-xl overflow-hidden relative shadow-inner cursor-pointer" onclick="playAnim('HitReact')">
+    <div id="canvas-container" class="w-full h-[500px] bg-black rounded-xl overflow-hidden relative shadow-inner cursor-grab active:cursor-grabbing">
       <!-- Hit Overlay -->
       <div id="hit-flash" class="absolute inset-0 bg-white pointer-events-none opacity-0 transition-opacity duration-75 z-20"></div>
     </div>
@@ -56,6 +56,7 @@
   <script type="module">
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
     import { mixamoVRMRigMap } from './mixamoVRMRigMap.js';
 
@@ -66,28 +67,43 @@
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0e17);
 
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 50);
-    camera.position.set(0, 1.25, 2.5);
+    // Centered fighting portrait camera (centered on torso/chest)
+    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 50);
+    camera.position.set(0, 1.25, 2.3);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 0.95;
     container.appendChild(renderer.domElement);
 
-    // Dungeon lighting
-    const ambLight = new THREE.AmbientLight(0xffffff, 1.0);
+    // Interactive camera orbit controls centered on the character
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.05, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI / 2 + 0.05;
+    controls.minDistance = 0.8;
+    controls.maxDistance = 5.0;
+    controls.update();
+
+    // Soft warm portrait lighting: preserves anime skin tones without washing out to pure white
+    const ambLight = new THREE.AmbientLight(0xffede6, 0.45);
     scene.add(ambLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffedd5, 1.8);
-    dirLight.position.set(1.5, 3.5, 2.0);
+    const dirLight = new THREE.DirectionalLight(0xfff3e8, 1.05);
+    dirLight.position.set(1.2, 2.6, 2.0);
     dirLight.castShadow = true;
     scene.add(dirLight);
 
-    const rimLight = new THREE.DirectionalLight(0x38bdf8, 1.0);
-    rimLight.position.set(-2, 2, -2);
+    const fillLight = new THREE.DirectionalLight(0xffe6e2, 0.35);
+    fillLight.position.set(-1.4, 1.6, 1.8);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0x7dd3fc, 0.4);
+    rimLight.position.set(-1.8, 2.2, -1.8);
     scene.add(rimLight);
 
     // Stone floor
@@ -154,6 +170,16 @@
               _quatA.toArray(clonedValues, i);
             }
 
+            // Upright neck posture in Idle: compensates for monster hunchback so face looks forward at camera
+            if (clip.name === 'Idle' && vrmBoneName === 'neck') {
+              const neckLift = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.48);
+              for (let i = 0; i < clonedValues.length; i += 4) {
+                _quatA.fromArray(clonedValues, i);
+                _quatA.multiply(neckLift);
+                _quatA.toArray(clonedValues, i);
+              }
+            }
+
             tracks.push(
               new THREE.QuaternionKeyframeTrack(
                 `${vrmNode.name}.${prop}`,
@@ -195,6 +221,12 @@
             obj.receiveShadow = true;
           }
         });
+
+        // Setup eye gaze tracking towards camera
+        if (vrm.lookAt) {
+          vrm.lookAt.target = camera;
+          vrm.lookAt.autoUpdate = true;
+        }
 
         scene.add(vrm.scene);
         vrm.scene.position.set(0, 0, 0);
@@ -304,6 +336,10 @@
     function animate() {
       requestAnimationFrame(animate);
       const dt = clock.getDelta();
+
+      if (controls) {
+        controls.update();
+      }
 
       // 1. Скелетная анимация обновляется ПЕРВОЙ
       if (mixer) {
