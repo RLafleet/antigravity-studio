@@ -148,6 +148,13 @@
         const vrmNode = vrm.humanoid?.getNormalizedBoneNode(vrmBoneName);
 
         if (vrmNode) {
+          // In Idle: omit monster clawing fingers and hunched shoulders to let anime hands rest naturally
+          if (clip.name === 'Idle') {
+            const isFinger = /Thumb|Index|Middle|Ring|Little/i.test(vrmBoneName);
+            const isShoulder = /Shoulder/i.test(vrmBoneName);
+            if (isFinger || isShoulder) return;
+          }
+
           const mixamoNode = sourceAsset.getObjectByName(splitted[0]) || sourceAsset.getObjectByName(rawRigName);
 
           if (track instanceof THREE.QuaternionKeyframeTrack) {
@@ -213,6 +220,24 @@
                 for (let i = 0; i < clonedValues.length; i += 4) {
                   _quatA.fromArray(clonedValues, i);
                   _quatA.multiply(elbowBend);
+                  _quatA.toArray(clonedValues, i);
+                }
+              }
+              if (vrmBoneName === 'leftHand') {
+                // Soft wrist orientation so relaxed hand hangs gracefully
+                const wristRot = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -0.25, 'YXZ'));
+                for (let i = 0; i < clonedValues.length; i += 4) {
+                  _quatA.fromArray(clonedValues, i);
+                  _quatA.multiply(wristRot);
+                  _quatA.toArray(clonedValues, i);
+                }
+              }
+              if (vrmBoneName === 'rightHand') {
+                // Soft wrist orientation so relaxed hand hangs gracefully
+                const wristRot = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.25, 'YXZ'));
+                for (let i = 0; i < clonedValues.length; i += 4) {
+                  _quatA.fromArray(clonedValues, i);
+                  _quatA.multiply(wristRot);
                   _quatA.toArray(clonedValues, i);
                 }
               }
