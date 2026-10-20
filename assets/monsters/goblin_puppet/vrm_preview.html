@@ -103,6 +103,8 @@
 
     const statusEl = document.getElementById('status');
 
+    const IDLE_SPEED = 0.55; // Замедленный размеренный цикл спокойного дыхания человека (~2.4 сек)
+
     let currentVrm = null;
     let mixer = null;
     const vrmActions = {};
@@ -211,6 +213,10 @@
               const act = mixer.clipAction(vrmClip);
               vrmActions[clip.name] = act;
 
+              if (clip.name === 'Idle') {
+                act.timeScale = IDLE_SPEED;
+                act.setEffectiveTimeScale(IDLE_SPEED);
+              }
               if (clip.name === 'HitReact') {
                 act.setLoop(THREE.LoopOnce);
                 act.clampWhenFinished = false;
@@ -221,24 +227,33 @@
               }
             });
 
-            // Smooth return to Idle
+            // Smooth return to Idle strictly maintaining steady calm IDLE_SPEED without warp or acceleration
             mixer.addEventListener('finished', (e) => {
               if (e.action === vrmActions['HitReact']) {
                 if (vrmActions['Idle']) {
-                  vrmActions['HitReact'].fadeOut(0.12);
-                  vrmActions['Idle'].reset().fadeIn(0.12).play();
-                  activeAction = vrmActions['Idle'];
+                  vrmActions['HitReact'].fadeOut(0.18);
+                  const idle = vrmActions['Idle'];
+                  idle.reset();
+                  idle.timeScale = IDLE_SPEED;
+                  idle.setEffectiveTimeScale(IDLE_SPEED);
+                  idle.setEffectiveWeight(1.0);
+                  idle.fadeIn(0.18).play();
+                  activeAction = idle;
                 }
               }
             });
 
             if (vrmActions['Idle']) {
+              vrmActions['Idle'].timeScale = IDLE_SPEED;
+              vrmActions['Idle'].setEffectiveTimeScale(IDLE_SPEED);
               vrmActions['Idle'].play();
               activeAction = vrmActions['Idle'];
             }
 
             statusEl.innerText = 'БОЕВОЙ ДВИЖОК ГОТОВ!';
             console.log('VRM and Animations ready:', vrmActions);
+            window.vrmActions = vrmActions;
+            window.currentVrm = vrm;
             window._vrmCombatReady = true;
           },
           null,
@@ -258,6 +273,7 @@
     window.playAnim = function(name) {
       if (!vrmActions[name]) return;
       const target = vrmActions[name];
+      const targetSpeed = (name === 'Idle') ? IDLE_SPEED : 1.0;
 
       if (name === 'HitReact') {
         const flash = document.getElementById('hit-flash');
@@ -269,10 +285,17 @@
 
       if (activeAction && activeAction !== target) {
         target.reset();
-        activeAction.crossFadeTo(target, 0.1, true);
+        target.timeScale = targetSpeed;
+        target.setEffectiveTimeScale(targetSpeed);
+        target.setEffectiveWeight(1.0);
+        // Explicitly warp: false prevents Three.js from altering timeScale based on clip length difference
+        activeAction.crossFadeTo(target, 0.18, false);
         target.play();
       } else {
-        target.reset().play();
+        target.reset();
+        target.timeScale = targetSpeed;
+        target.setEffectiveTimeScale(targetSpeed);
+        target.play();
       }
       activeAction = target;
     };
@@ -282,11 +305,13 @@
       requestAnimationFrame(animate);
       const dt = clock.getDelta();
 
-      if (currentVrm) {
-        currentVrm.update(dt);
-      }
+      // 1. Скелетная анимация обновляется ПЕРВОЙ
       if (mixer) {
         mixer.update(dt);
+      }
+      // 2. Физика SpringBone рассчитывается ВТОРОЙ (устраняет рассинхрон и резонансную тряску)
+      if (currentVrm) {
+        currentVrm.update(dt);
       }
       renderer.render(scene, camera);
     }
