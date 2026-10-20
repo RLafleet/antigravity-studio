@@ -170,13 +170,51 @@
               _quatA.toArray(clonedValues, i);
             }
 
-            // Upright neck posture in Idle: compensates for monster hunchback so face looks forward at camera
-            if (clip.name === 'Idle' && vrmBoneName === 'neck') {
-              const neckLift = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.48);
-              for (let i = 0; i < clonedValues.length; i += 4) {
-                _quatA.fromArray(clonedValues, i);
-                _quatA.multiply(neckLift);
-                _quatA.toArray(clonedValues, i);
+            // Natural humanoid posture in Idle (compensates for monster hunchback and wide ape arms)
+            if (clip.name === 'Idle') {
+              if (vrmBoneName === 'neck') {
+                const neckLift = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.48);
+                for (let i = 0; i < clonedValues.length; i += 4) {
+                  _quatA.fromArray(clonedValues, i);
+                  _quatA.multiply(neckLift);
+                  _quatA.toArray(clonedValues, i);
+                }
+              }
+              if (vrmBoneName === 'leftUpperArm') {
+                // Lower left arm ~65 deg down and close to body (compensates for monster raised claw)
+                const armOffset = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, -0.1, -1.15, 'YXZ'));
+                for (let i = 0; i < clonedValues.length; i += 4) {
+                  _quatA.fromArray(clonedValues, i);
+                  _quatA.multiply(armOffset);
+                  _quatA.toArray(clonedValues, i);
+                }
+              }
+              if (vrmBoneName === 'rightUpperArm') {
+                // Lower right arm ~55 deg down and close to body
+                const armOffset = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, -0.15, 0.95, 'YXZ'));
+                for (let i = 0; i < clonedValues.length; i += 4) {
+                  _quatA.fromArray(clonedValues, i);
+                  _quatA.multiply(armOffset);
+                  _quatA.toArray(clonedValues, i);
+                }
+              }
+              if (vrmBoneName === 'leftLowerArm') {
+                // Soft elbow bend
+                const elbowBend = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -0.25, -0.25, 'YXZ'));
+                for (let i = 0; i < clonedValues.length; i += 4) {
+                  _quatA.fromArray(clonedValues, i);
+                  _quatA.multiply(elbowBend);
+                  _quatA.toArray(clonedValues, i);
+                }
+              }
+              if (vrmBoneName === 'rightLowerArm') {
+                // Soft elbow bend
+                const elbowBend = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.25, 0.25, 'YXZ'));
+                for (let i = 0; i < clonedValues.length; i += 4) {
+                  _quatA.fromArray(clonedValues, i);
+                  _quatA.multiply(elbowBend);
+                  _quatA.toArray(clonedValues, i);
+                }
               }
             }
 
@@ -226,6 +264,28 @@
         if (vrm.lookAt) {
           vrm.lookAt.target = camera;
           vrm.lookAt.autoUpdate = true;
+        }
+
+        // Natural downward gravity for dress & skirt cloth springs so it drapes elegantly
+        if (vrm.springBoneManager) {
+          vrm.springBoneManager.springBones.forEach((spring) => {
+            const bName = spring.bone?.name?.toLowerCase() || '';
+            if (bName.includes('skirt') || bName.includes('cloth')) {
+              spring.settings.gravityPower = 1.6;
+              spring.settings.gravityDir.set(0, -1, 0);
+              spring.settings.dragForce = 0.45;
+            }
+          });
+          // Scale down leg colliders that push skirt outward like an umbrella
+          if (vrm.springBoneManager.colliderGroups) {
+            vrm.springBoneManager.colliderGroups.forEach((cg) => {
+              cg.colliders.forEach((col) => {
+                if (col.shape && typeof col.shape.radius === 'number') {
+                  col.shape.radius *= 0.65;
+                }
+              });
+            });
+          }
         }
 
         scene.add(vrm.scene);
